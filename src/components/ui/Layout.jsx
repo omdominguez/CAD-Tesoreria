@@ -9,7 +9,7 @@ import { C, FONTS, UI } from "../../constants/theme";
 export function Card({ children, style }) { 
   return (
     <div style={{ 
-      background: "#fff", 
+      background: C.surface, 
       border: `1px solid ${C.line}`, 
       borderRadius: UI.RADIUS, 
       boxShadow: UI.SHADOW, 
@@ -27,7 +27,7 @@ export function Modal({ title, onClose, children, wide }) {
       style={{ 
         position: "fixed", 
         inset: 0, 
-        background: "rgba(15,30,16,0.5)", 
+        background: "rgba(14,17,13,0.45)", 
         backdropFilter: "blur(2px)", 
         display: "flex", 
         alignItems: "flex-start", 
@@ -40,11 +40,12 @@ export function Modal({ title, onClose, children, wide }) {
       <div 
         onClick={(e) => e.stopPropagation()} 
         style={{ 
-          background: "#fff", 
-          borderRadius: 18, 
+          background: C.surface, 
+          borderRadius: UI.RADIUS + 2, 
           width: "100%", 
           maxWidth: wide ? 900 : 480, 
-          boxShadow: "0 24px 70px rgba(0,0,0,0.3)" 
+          boxShadow: UI.SHADOW_MODAL,
+          border: `1px solid ${C.line}`,
         }}
       >
         <div style={{ 
@@ -54,7 +55,7 @@ export function Modal({ title, onClose, children, wide }) {
           padding: "16px 22px", 
           borderBottom: `1px solid ${C.line}` 
         }}>
-          <div style={{ fontFamily: FONTS.SERIF, fontSize: 19, fontWeight: 700, color: C.greenDk }}>
+          <div style={{ fontFamily: FONTS.SANS, fontSize: 16, fontWeight: 700, color: C.ink, letterSpacing: -0.2 }}>
             {title}
           </div>
           <button 
@@ -62,9 +63,9 @@ export function Modal({ title, onClose, children, wide }) {
             style={{ 
               background: C.paper, 
               border: `1px solid ${C.line}`, 
-              width: 32, 
-              height: 32, 
-              borderRadius: 9, 
+              width: 30, 
+              height: 30, 
+              borderRadius: UI.RADIUS_SM, 
               cursor: "pointer", 
               color: C.mut, 
               display: "inline-flex", 
@@ -72,7 +73,7 @@ export function Modal({ title, onClose, children, wide }) {
               justifyContent: "center" 
             }}
           >
-            <X size={18} />
+            <X size={17} />
           </button>
         </div>
         <div style={{ padding: 22, maxHeight: "80vh", overflowY: "auto" }}>
@@ -85,20 +86,20 @@ export function Modal({ title, onClose, children, wide }) {
 
 export function Empty({ icon: Icon, title, msg, action }) {
   return (
-    <div style={{ textAlign: "center", padding: "48px 20px" }}>
+    <div style={{ textAlign: "center", padding: "48px 20px", border: `1px dashed ${C.line}`, borderRadius: UI.RADIUS, background: C.surface }}>
       <div style={{ 
-        width: 56, 
-        height: 56, 
-        borderRadius: 16, 
-        background: C.greenSoft, 
+        width: 52, 
+        height: 52, 
+        borderRadius: UI.RADIUS_SM, 
+        background: C.body, 
         display: "inline-flex", 
         alignItems: "center", 
         justifyContent: "center", 
-        color: C.green 
+        color: C.ink 
       }}>
-        <Icon size={27} />
+        <Icon size={24} />
       </div>
-      <div style={{ fontFamily: FONTS.SERIF, fontSize: 18, fontWeight: 700, color: C.ink, marginTop: 14 }}>
+      <div style={{ fontFamily: FONTS.SANS, fontSize: 16, fontWeight: 700, color: C.ink, marginTop: 14, letterSpacing: -0.2 }}>
         {title}
       </div>
       <div style={{ color: C.mut, fontSize: 13.5, marginTop: 6, maxWidth: 420, marginInline: "auto" }}>
@@ -109,7 +110,7 @@ export function Empty({ icon: Icon, title, msg, action }) {
   );
 }
 
-export function Section({ title, desc, action, children }) {
+export function Section({ title, desc, action, children, eyebrow }) {
   return (
     <div>
       <div style={{ 
@@ -121,11 +122,16 @@ export function Section({ title, desc, action, children }) {
         marginBottom: 18 
       }}>
         <div>
-          <h2 style={{ fontFamily: FONTS.SERIF, fontSize: 25, fontWeight: 700, color: C.greenDk, margin: 0 }}>
+          {eyebrow && (
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.green, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>
+              {eyebrow}
+            </div>
+          )}
+          <h2 style={{ fontFamily: FONTS.SANS, fontSize: 22, fontWeight: 800, color: C.ink, margin: 0, letterSpacing: -0.4 }}>
             {title}
           </h2>
           {desc && (
-            <p style={{ color: C.mut, fontSize: 13.5, margin: "5px 0 0", maxWidth: 680 }}>
+            <p style={{ color: C.mut, fontSize: 13.5, margin: "6px 0 0", maxWidth: 680 }}>
               {desc}
             </p>
           )}
@@ -143,7 +149,7 @@ export function Section({ title, desc, action, children }) {
 
 export function AppShell({ children }) {
   return (
-    <div style={{ display: "flex", height: "100vh", backgroundColor: C.body || "#F7F9F8", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100vh", backgroundColor: C.body, overflow: "hidden", fontFamily: FONTS.SANS }}>
       {children}
     </div>
   );
@@ -152,9 +158,9 @@ export function AppShell({ children }) {
 export function Sidebar({ open, children }) {
   return (
     <div style={{ 
-      width: open ? 260 : 0, 
-      transition: "width 0.3s ease", 
-      backgroundColor: "#fff", 
+      width: open ? 252 : 0, 
+      transition: "width 0.2s ease", 
+      backgroundColor: C.body, 
       borderRight: `1px solid ${C.line}`,
       display: "flex",
       flexDirection: "column",
@@ -175,18 +181,21 @@ export function SidebarItem({ act, onClick, children, style }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 12,
-        padding: "10px 14px",
+        gap: 11,
+        padding: "9px 12px",
         width: "100%",
-        borderRadius: UI.RADIUS,
+        borderRadius: UI.RADIUS_SM,
         border: "none",
-        backgroundColor: act ? C.greenSoft : "transparent",
-        color: act ? C.greenDk : C.mut,
-        fontWeight: act ? 600 : 500,
-        fontSize: 14,
+        borderLeft: act ? `2px solid ${C.green}` : "2px solid transparent",
+        backgroundColor: act ? C.surface : "transparent",
+        boxShadow: act ? UI.SHADOW : "none",
+        color: act ? C.ink : C.mut,
+        fontWeight: act ? 700 : 500,
+        fontSize: 13.5,
         cursor: "pointer",
         textAlign: "left",
-        transition: "all 0.2s",
+        transition: "background-color .12s, color .12s",
+        fontFamily: FONTS.SANS,
         ...style
       }}
     >
@@ -202,7 +211,8 @@ export function MainContent({ children }) {
       display: "flex", 
       flexDirection: "column",
       overflowY: "auto",
-      position: "relative"
+      position: "relative",
+      backgroundColor: C.paper,
     }}>
       {children}
     </div>
@@ -216,9 +226,9 @@ export function TopBar({ children }) {
       justifyContent: "space-between",
       alignItems: "center",
       padding: "12px 24px",
-      backgroundColor: "#fff",
+      backgroundColor: C.surface,
       borderBottom: `1px solid ${C.line}`,
-      minHeight: 60,
+      minHeight: 58,
       position: "sticky",
       top: 0,
       zIndex: 10

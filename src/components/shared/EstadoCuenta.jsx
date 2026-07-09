@@ -69,7 +69,7 @@ export function EstadoCuenta({ rows, positivoEs }) {
       </div>
       
       {/* Resumen del Saldo Final */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", background: "#FCFDFB", borderTop: `1px solid ${C.line}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", background: C.body, borderTop: `1px solid ${C.line}` }}>
         <span style={{ fontSize: 12.5, color: C.mut, fontWeight: 600 }}>
           Saldo actual (equivalente USD)
         </span>

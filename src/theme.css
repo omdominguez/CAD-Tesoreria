@@ -1,0 +1,159 @@
+/* ============================================================
+   MODO CLARO / OSCURO Â· El Maizalito
+   ------------------------------------------------------------
+   Todos los colores de la app viven aquÃ­ como variables CSS.
+   theme.js simplemente los referencia (var(--ink), etc.), asÃ­
+   que cambiar de modo no requiere tocar ningÃºn componente.
+
+   Comportamiento:
+   - Sin el atributo data-theme (o data-theme="auto"): sigue la
+     preferencia del sistema operativo automÃ¡ticamente.
+   - data-theme="light" / data-theme="dark": fuerza el modo,
+     sin importar el sistema operativo.
+   ============================================================ */
+
+:root {
+  --ink: #12140F;
+  --mut: #75816F;
+  --mut2: #A2AC9B;
+  --line: #E7E9E1;
+  --line-strong: #D7DACE;
+  --paper: #F7F8F3;
+  --body: #F3F4EE;
+  --surface: #FFFFFF;
+
+  --green: #14532B;
+  --green-dk: #0B3620;
+  --green-soft: #E8F0E7;
+
+  --gold: #A9740A;
+  --gold-soft: #F6EFDA;
+
+  --rojo: #B3271E;
+  --rojo-soft: #FAEAE8;
+  --amar: #95690A;
+  --amar-soft: #FAF0D9;
+  --verde: #166A34;
+  --verde-soft: #E7F3EA;
+  --azul: #1D4ED8;
+  --azul-soft: #E8EEFD;
+  --mut-soft: #EEF1EC;
+  --rojo-line: #EDD3D0;
+
+  --shadow: 0 1px 2px rgba(18,20,15,0.03);
+  --shadow-modal: 0 24px 60px rgba(10,14,10,0.20);
+
+  color-scheme: light;
+}
+
+/* Modo oscuro automÃ¡tico: solo cuando el usuario no forzÃ³ un modo */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --ink: #EDEFE8;
+    --mut: #93A08A;
+    --mut2: #616B5A;
+    --line: #2B2E26;
+    --line-strong: #3A3E34;
+    --paper: #16180F;
+    --body: #1D1F1A;
+    --surface: #212319;
+
+    --green: #4C9A6A;
+    --green-dk: #7FBF97;
+    --green-soft: #1D3324;
+
+    --gold: #D6A84A;
+    --gold-soft: #332A16;
+
+    --rojo: #E5837A;
+    --rojo-soft: #3A2020;
+    --amar: #E0B45A;
+    --amar-soft: #362C16;
+    --verde: #5CB482;
+    --verde-soft: #1C3324;
+    --azul: #7CA2F0;
+    --azul-soft: #1B2740;
+    --mut-soft: #262920;
+    --rojo-line: #4A2C2A;
+
+    --shadow: 0 1px 2px rgba(0,0,0,0.28);
+    --shadow-modal: 0 24px 60px rgba(0,0,0,0.55);
+
+    color-scheme: dark;
+  }
+}
+
+/* Modo oscuro forzado manualmente (independiente del sistema operativo) */
+:root[data-theme="dark"] {
+  --ink: #EDEFE8;
+  --mut: #93A08A;
+  --mut2: #616B5A;
+  --line: #2B2E26;
+  --line-strong: #3A3E34;
+  --paper: #16180F;
+  --body: #1D1F1A;
+  --surface: #212319;
+
+  --green: #4C9A6A;
+  --green-dk: #7FBF97;
+  --green-soft: #1D3324;
+
+  --gold: #D6A84A;
+  --gold-soft: #332A16;
+
+  --rojo: #E5837A;
+  --rojo-soft: #3A2020;
+  --amar: #E0B45A;
+  --amar-soft: #362C16;
+  --verde: #5CB482;
+  --verde-soft: #1C3324;
+  --azul: #7CA2F0;
+  --azul-soft: #1B2740;
+  --mut-soft: #262920;
+  --rojo-line: #4A2C2A;
+
+  --shadow: 0 1px 2px rgba(0,0,0,0.28);
+  --shadow-modal: 0 24px 60px rgba(0,0,0,0.55);
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  background: var(--paper);
+}
+
+body {
+  margin: 0;
+  transition: background-color .15s ease;
+}
+
+/* ------------------------------------------------------------
+   Hover del Sidebar (los Ã­tems de navegaciÃ³n de la captura)
+   ------------------------------------------------------------
+   El fondo del Ã­tem activo se sigue fijando en lÃ­nea (inline)
+   desde React; el hover solo aplica cuando el Ã­tem NO estÃ¡
+   activo, asÃ­ que no compite con el estilo del item activo.
+   ------------------------------------------------------------ */
+.cad-sidebar-item {
+  background-color: transparent;
+  transition: background-color .12s ease, color .12s ease;
+}
+.cad-sidebar-item:hover {
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+/* Hover sutil para botones "ghost" / "soft" / "danger" */
+.cad-btn:hover {
+  filter: brightness(0.97);
+}
+:root[data-theme="dark"] .cad-btn:hover {
+  filter: brightness(1.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .cad-btn:hover {
+    filter: brightness(1.12);
+  }
+}

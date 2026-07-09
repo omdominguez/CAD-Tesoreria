@@ -13,9 +13,13 @@ import {
 // Contexto de Autenticación
 import { useAuth } from "./services/auth";
 
+// Tema
+import { C, FONTS } from "./constants/theme";
+
 // Componentes UI de Layout Global
 import { AppShell, Sidebar, TopBar, MainContent, SidebarItem } from "./components/ui/Layout";
 import { Btn } from "./components/ui/Buttons";
+import { ThemeToggle } from "./components/ui/ThemeToggle";
 
 // Vistas Principales (Los módulos que creamos)
 import Tablero from "./views/Tablero/Tablero";
@@ -42,11 +46,11 @@ export default function Workspace({ st, act }) {
       <Sidebar open={sidebarOpen}>
         <div>
           {/* Logo o Cabecera del Sistema */}
-          <div style={{ padding: "20px 16px", borderBottom: "1px solid #E3E8E5", marginBottom: 16 }}>
-            <div style={{ fontFamily: "Cinzel, serif", fontSize: 18, fontWeight: 700, color: "#1E2922", letterSpacing: 0.5 }}>
+          <div style={{ padding: "20px 16px", borderBottom: `1px solid ${C.line}`, marginBottom: 16 }}>
+            <div style={{ fontFamily: FONTS.SANS, fontSize: 17, fontWeight: 800, color: C.ink, letterSpacing: -0.3 }}>
               EL MAIZALITO
             </div>
-            <div style={{ fontSize: 11, color: "#6B7A70", fontWeight: 600, marginTop: 2, letterSpacing: 0.3 }}>
+            <div style={{ fontSize: 10.5, color: C.mut, fontWeight: 700, marginTop: 2, letterSpacing: 0.6, textTransform: "uppercase" }}>
               SISTEMA FINANCIERO
             </div>
           </div>
@@ -83,8 +87,14 @@ export default function Workspace({ st, act }) {
         </div>
 
         {/* Botón de Salida (Bottom del Sidebar) */}
-        <div style={{ padding: 12, borderTop: "1px solid #E3E8E5" }}>
-          <SidebarItem style={{ color: "#A24438" }} onClick={signOut}>
+        <div style={{ padding: 12, borderTop: `1px solid ${C.line}`, display: "grid", gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: C.mut, letterSpacing: 0.5, textTransform: "uppercase", padding: "0 2px 6px" }}>
+              Apariencia
+            </div>
+            <ThemeToggle compact />
+          </div>
+          <SidebarItem style={{ color: C.rojo }} onClick={signOut}>
             <LogOut size={16} /> Cerrar Sesión
           </SidebarItem>
         </div>
@@ -98,15 +108,15 @@ export default function Workspace({ st, act }) {
             <Btn small variant="ghost" onClick={() => setSidebarOpen(!sidebarOpen)} style={{ padding: 6 }}>
               {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
             </Btn>
-            <div style={{ fontSize: 13, color: "#6B7A70", fontWeight: 500 }}>
-              Tasa BCV del día: <b style={{ color: "#1E2922", fontVariantNumeric: "tabular-nums" }}>Bs {Number(st.config?.tasaBCV || 0).toFixed(2)}</b>
+            <div style={{ fontSize: 13, color: C.mut, fontWeight: 500 }}>
+              Tasa BCV del día: <b style={{ color: C.ink, fontVariantNumeric: "tabular-nums" }}>Bs {Number(st.config?.tasaBCV || 0).toFixed(2)}</b>
             </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, textAlign: "right" }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#1E2922" }}>{user?.email}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#8B9E92" }}>{ROL_LBL[role] || "Usuario"}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{user?.email}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: C.mut }}>{ROL_LBL[role] || "Usuario"}</div>
             </div>
           </div>
         </TopBar>

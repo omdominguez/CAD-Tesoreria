@@ -1,10 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "./services/auth";
 import { LOGO } from "./logo.jsx";
-
-const GREEN = "#1B5E20", GOLD = "#B8860B", PAPER = "#FBFAF6", INK = "#1F2933", MUT = "#6B7A70", LINE = "#E3E6DE";
-const SERIF = "'Iowan Old Style','Palatino Linotype','Book Antiqua',Georgia,serif";
-const SANS = "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
+import { C, FONTS, UI } from "./constants/theme";
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
@@ -34,33 +31,33 @@ export default function Login() {
     setBusy(false);
   };
 
-  const input = { width: "100%", padding: "11px 12px", border: `1px solid ${LINE}`, borderRadius: 10, fontSize: 14, fontFamily: SANS, color: INK, background: PAPER, boxSizing: "border-box", marginBottom: 12 };
+  const input = { width: "100%", padding: "11px 12px", border: `1px solid ${C.line}`, borderRadius: UI.RADIUS_SM, fontSize: 14, fontFamily: FONTS.SANS, color: C.ink, background: C.paper, boxSizing: "border-box", marginBottom: 12, outline: "none" };
 
   return (
-    <div style={{ minHeight: "100vh", background: PAPER, fontFamily: SANS, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div style={{ width: "100%", maxWidth: 400 }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 22 }}>
-          <img src={LOGO} alt="CAD Venezuela" style={{ height: 62, display: "block" }} />
-          <div style={{ fontSize: 12.5, color: MUT, textAlign: "center" }}>Tesorería &amp; Proyección de Pagos · El Maizalito</div>
+    <div style={{ minHeight: "100vh", background: C.body, fontFamily: FONTS.SANS, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 384 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 26 }}>
+          <img src={LOGO} alt="CAD Venezuela" style={{ height: 56, display: "block" }} />
+          <div style={{ fontSize: 12.5, color: C.mut, textAlign: "center" }}>Tesorería &amp; Proyección de Pagos · El Maizalito</div>
         </div>
 
-        <div style={{ background: "#fff", border: `1px solid ${LINE}`, borderRadius: 16, padding: 24, boxShadow: "0 12px 40px rgba(0,0,0,0.06)" }}>
-          <div style={{ fontFamily: SERIF, fontSize: 18, fontWeight: 700, color: INK, marginBottom: 4 }}>{modo === "in" ? "Iniciar sesión" : "Crear cuenta"}</div>
-          <div style={{ fontSize: 13, color: MUT, marginBottom: 18 }}>{modo === "in" ? "Entra con tu usuario del equipo." : "Regístrate; el Master te asignará tu rol."}</div>
+        <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: UI.RADIUS + 2, padding: 26, boxShadow: UI.SHADOW }}>
+          <div style={{ fontFamily: FONTS.SANS, fontSize: 18, fontWeight: 800, color: C.ink, marginBottom: 4, letterSpacing: -0.3 }}>{modo === "in" ? "Iniciar sesión" : "Crear cuenta"}</div>
+          <div style={{ fontSize: 13, color: C.mut, marginBottom: 20 }}>{modo === "in" ? "Entra con tu usuario del equipo." : "Regístrate; el Master te asignará tu rol."}</div>
 
-          {msg && <div style={{ background: "#FBEAE7", color: "#B23B2E", padding: "9px 12px", borderRadius: 9, fontSize: 12.5, marginBottom: 12 }}>{msg}</div>}
-          {ok && <div style={{ background: "#E6F4EA", color: "#16803C", padding: "9px 12px", borderRadius: 9, fontSize: 12.5, marginBottom: 12 }}>{ok}</div>}
+          {msg && <div style={{ background: C.rojoSoft, color: C.rojo, padding: "9px 12px", borderRadius: UI.RADIUS_SM, fontSize: 12.5, marginBottom: 12 }}>{msg}</div>}
+          {ok && <div style={{ background: C.verdeSoft, color: C.verde, padding: "9px 12px", borderRadius: UI.RADIUS_SM, fontSize: 12.5, marginBottom: 12 }}>{ok}</div>}
 
           <input type="email" placeholder="Correo" value={email} onChange={(e) => setEmail(e.target.value)} style={input} onKeyDown={(e) => e.key === "Enter" && enviar()} />
           <input type="password" placeholder="Contraseña" value={pass} onChange={(e) => setPass(e.target.value)} style={input} onKeyDown={(e) => e.key === "Enter" && enviar()} />
 
-          <button onClick={enviar} disabled={busy} style={{ width: "100%", padding: "11px", background: GREEN, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 }}>
+          <button onClick={enviar} disabled={busy} style={{ width: "100%", padding: "11px", background: C.ink, color: "#fff", border: "none", borderRadius: UI.RADIUS_SM, fontSize: 14, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, fontFamily: FONTS.SANS }}>
             {busy ? "Un momento…" : modo === "in" ? "Entrar" : "Registrarme"}
           </button>
 
-          <div style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: MUT }}>
+          <div style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: C.mut }}>
             {modo === "in" ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
-            <button onClick={() => { setModo(modo === "in" ? "up" : "in"); setMsg(null); setOk(null); }} style={{ background: "none", border: "none", color: GREEN, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+            <button onClick={() => { setModo(modo === "in" ? "up" : "in"); setMsg(null); setOk(null); }} style={{ background: "none", border: "none", color: C.green, fontWeight: 700, cursor: "pointer", fontSize: 13, fontFamily: FONTS.SANS }}>
               {modo === "in" ? "Crear una" : "Iniciar sesión"}
             </button>
           </div>

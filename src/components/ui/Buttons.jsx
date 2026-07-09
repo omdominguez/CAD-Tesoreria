@@ -4,16 +4,17 @@ import { C, FONTS, UI } from "../../constants/theme";
 export function Btn({ children, onClick, variant = "primary", small, disabled, title }) {
   const base = { 
     border: "1px solid transparent", 
-    borderRadius: 10, 
+    borderRadius: UI.RADIUS_SM, 
     fontWeight: 600, 
     cursor: disabled ? "not-allowed" : "pointer", 
-    opacity: disabled ? 0.45 : 1, 
+    opacity: disabled ? 0.4 : 1, 
     fontFamily: FONTS.SANS, 
     display: "inline-flex", 
     alignItems: "center", 
     gap: 6, 
     whiteSpace: "nowrap", 
-    transition: "transform .05s" 
+    transition: "background-color .12s, border-color .12s, opacity .12s",
+    letterSpacing: 0.1,
   };
   
   const pad = small 
@@ -21,15 +22,16 @@ export function Btn({ children, onClick, variant = "primary", small, disabled, t
     : { padding: "9px 15px", fontSize: 13.5 };
     
   const styles = {
-    primary: { background: C.green, color: "#fff", boxShadow: "0 1px 2px rgba(27,94,32,.35)" },
-    gold: { background: C.gold, color: "#fff", boxShadow: "0 1px 2px rgba(184,134,11,.35)" },
-    ghost: { background: "#fff", color: C.ink, borderColor: C.line },
+    primary: { background: C.ink, color: "#fff" },
+    gold: { background: C.gold, color: "#fff" },
+    ghost: { background: C.surface, color: C.ink, borderColor: C.line },
     soft: { background: C.greenSoft, color: C.greenDk },
-    danger: { background: "#fff", color: C.rojo, borderColor: "#EBC7C1" },
+    danger: { background: C.surface, color: C.rojo, borderColor: "var(--rojo-line)" },
   };
   
   return (
     <button 
+      className="cad-btn"
       title={title} 
       disabled={disabled} 
       onClick={onClick} 
@@ -44,10 +46,10 @@ export function Segmented({ options, value, onChange }) {
   return (
     <div style={{ 
       display: "inline-flex", 
-      background: "#ECEFEA", 
+      background: C.body, 
       border: `1px solid ${C.line}`, 
-      borderRadius: 12, 
-      padding: 4, 
+      borderRadius: UI.RADIUS_SM + 2, 
+      padding: 3, 
       gap: 2, 
       flexWrap: "wrap" 
     }}>
@@ -63,17 +65,16 @@ export function Segmented({ options, value, onChange }) {
               display: "inline-flex", 
               alignItems: "center", 
               gap: 7, 
-              border: "none", 
+              border: on ? `1px solid ${C.line}` : "1px solid transparent", 
               cursor: "pointer", 
-              borderRadius: 9, 
-              padding: "8px 14px", 
+              borderRadius: UI.RADIUS_SM, 
+              padding: "7px 13px", 
               fontSize: 13, 
               fontWeight: 600, 
               fontFamily: FONTS.SANS, 
               whiteSpace: "nowrap", 
-              background: on ? "#fff" : "transparent", 
-              color: on ? C.greenDk : C.mut, 
-              boxShadow: on ? UI.SHADOW_SM : "none" 
+              background: on ? C.surface : "transparent", 
+              color: on ? C.ink : C.mut,
             }}
           >
             {Ic && <Ic size={15} />} {o.label}

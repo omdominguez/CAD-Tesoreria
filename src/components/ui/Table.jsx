@@ -16,7 +16,7 @@ export function Th({ children, right }) {
       borderBottom: `1px solid ${C.line}`, 
       letterSpacing: 0.4, 
       textTransform: "uppercase", 
-      background: "#FCFDFB", 
+      background: C.body, 
       position: "sticky", 
       top: 0 
     }}>
@@ -43,12 +43,12 @@ export function Td({ children, right, bold }) {
 
 // Estilo auxiliar para los botones de la paginación
 const pgBtn = (dis) => ({ 
-  width: 32, 
-  height: 32, 
+  width: 30, 
+  height: 30, 
   borderRadius: 8, 
   border: `1px solid ${C.line}`, 
-  background: "#fff", 
-  color: dis ? "#C9CFC4" : C.ink, 
+  background: C.surface, 
+  color: dis ? C.mut2 : C.ink, 
   cursor: dis ? "not-allowed" : "pointer", 
   display: "inline-flex", 
   alignItems: "center", 

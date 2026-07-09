@@ -365,7 +365,7 @@ function InnerApp() {
   // 3. Renderizado condicional según el estado de la sesión
   if (authLoading || (user && role && storeLoading)) {
     return (
-      <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: C.bg, fontFamily: "sans-serif", color: C.mut, fontSize: 14 }}>
+      <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: C.paper, fontFamily: "sans-serif", color: C.mut, fontSize: 14 }}>
         Sincronizando con El Maizalito Real-Time...
       </div>
     );

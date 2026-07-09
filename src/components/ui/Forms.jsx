@@ -6,11 +6,11 @@ const inputStyle = {
   width: "100%", 
   padding: "9px 11px", 
   border: `1px solid ${C.line}`, 
-  borderRadius: 10, 
+  borderRadius: 8, 
   fontSize: 13.5, 
   fontFamily: FONTS.SANS, 
   color: C.ink, 
-  background: "#fff", 
+  background: C.surface, 
   boxSizing: "border-box" 
 };
 

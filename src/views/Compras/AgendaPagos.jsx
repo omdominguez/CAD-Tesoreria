@@ -149,7 +149,7 @@ function Columna({ st, titulo, llaves, data, color, colorSoft, moneda }) {
                     const prox = dv >= 0 && dv <= 7;
                     
                     return (
-                      <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 11px", border: `1px solid ${venc ? "#EBC7C1" : C.line}`, background: venc ? C.rojoSoft : "#fff", borderRadius: 10 }}>
+                      <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 11px", border: `1px solid ${venc ? "var(--rojo-line)" : C.line}`, background: venc ? C.rojoSoft : C.surface, borderRadius: 10 }}>
                         <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {provNom(st, c.proveedorId)}

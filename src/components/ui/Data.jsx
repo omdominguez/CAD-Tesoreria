@@ -11,7 +11,7 @@ export function Badge({ tone, children }) {
     rojo: [C.rojo, C.rojoSoft], 
     green: [C.greenDk, C.greenSoft], 
     gold: [C.gold, C.goldSoft], 
-    mut: [C.mut, "#EEF1EC"], 
+    mut: [C.mut, "var(--mut-soft)"], 
     azul: [C.azul, C.azulSoft] 
   };
   
@@ -35,37 +35,38 @@ export function Badge({ tone, children }) {
 
 export function KpiCard({ t, v, ic: Ic, tone, sub }) {
   return (
-    <Card style={{ padding: 18, borderTop: `3px solid ${tone}` }}>
+    <Card style={{ padding: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ 
-          fontSize: 12, 
+          fontSize: 11.5, 
           fontWeight: 700, 
           color: C.mut, 
           textTransform: "uppercase", 
-          letterSpacing: 0.3 
+          letterSpacing: 0.4 
         }}>
           {t}
         </div>
         <div style={{ 
-          width: 34, 
-          height: 34, 
-          borderRadius: 10, 
-          background: tone + "18", // Añade opacidad (hex) al color recibido
+          width: 30, 
+          height: 30, 
+          borderRadius: 8, 
+          background: C.body, 
           display: "inline-flex", 
           alignItems: "center", 
           justifyContent: "center", 
           color: tone 
         }}>
-          <Ic size={18} />
+          <Ic size={16} />
         </div>
       </div>
       
       <div style={{ 
-        fontFamily: FONTS.SERIF, 
-        fontSize: 29, 
-        fontWeight: 700, 
-        color: tone, 
+        fontFamily: FONTS.SANS, 
+        fontSize: 27, 
+        fontWeight: 800, 
+        color: C.ink, 
         marginTop: 10, 
+        letterSpacing: -0.5,
         fontVariantNumeric: "tabular-nums" 
       }}>
         {money(v, "USD")}

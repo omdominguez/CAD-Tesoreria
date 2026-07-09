@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useAuth } from "./auth.jsx";
+import { useAuth } from "./services/auth";
+import { LOGO } from "./logo.jsx";
 
 const GREEN = "#1B5E20", GOLD = "#B8860B", PAPER = "#FBFAF6", INK = "#1F2933", MUT = "#6B7A70", LINE = "#E3E6DE";
 const SERIF = "'Iowan Old Style','Palatino Linotype','Book Antiqua',Georgia,serif";
@@ -38,12 +39,9 @@ export default function Login() {
   return (
     <div style={{ minHeight: "100vh", background: PAPER, fontFamily: SANS, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ width: "100%", maxWidth: 400 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "center", marginBottom: 20 }}>
-          <div style={{ width: 46, height: 46, borderRadius: 12, background: GOLD, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: SERIF, fontWeight: 800, fontSize: 24, color: "#fff" }}>M</div>
-          <div>
-            <div style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 700, color: GREEN, lineHeight: 1.1 }}>El Maizalito · CAD</div>
-            <div style={{ fontSize: 12, color: MUT }}>Soporte financiero y proyección de pagos</div>
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 22 }}>
+          <img src={LOGO} alt="CAD Venezuela" style={{ height: 62, display: "block" }} />
+          <div style={{ fontSize: 12.5, color: MUT, textAlign: "center" }}>Tesorería &amp; Proyección de Pagos · El Maizalito</div>
         </div>
 
         <div style={{ background: "#fff", border: `1px solid ${LINE}`, borderRadius: 16, padding: 24, boxShadow: "0 12px 40px rgba(0,0,0,0.06)" }}>

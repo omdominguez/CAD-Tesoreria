@@ -1,12 +1,9 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { AuthProvider } from "./auth.jsx";
-import App from "./App.jsx";
+import App from "./App"; // Removimos la extensión .jsx que a veces da guerra
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <App />
   </React.StrictMode>
 );

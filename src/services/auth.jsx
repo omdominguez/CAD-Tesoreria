@@ -1,90 +1,52 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from "react";
+import { supabase, isConfigured } from "../supabase.js";
 
-// Asegúrate de importar aquí tu cliente de Supabase
-// import { supabase } from './store';
-
-const AuthContext = createContext({
-  user: null,
-  role: null,
-  signOut: async () => {},
-});
+const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  async function loadProfile(userId) {
+    try {
+      const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
+      setProfile(data || null);
+    } catch (e) {
+      setProfile(null);
+    }
+  }
+
   useEffect(() => {
-    /* =========================================================
-       IMPLEMENTACIÓN REAL CON SUPABASE
-       Descomenta este bloque cuando conectes tu backend
-       ========================================================= */
-    /*
-    const initAuth = async () => {
+    if (!isConfigured) { setLoading(false); return; }
+    let subscription;
+    (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-      
-      if (session?.user) {
-        // Cargar el rol asignado desde la tabla de perfiles
-        const { data } = await supabase.from('profiles').select('rol').eq('id', session.user.id).single();
-        if (data) setRole(data.rol);
-      }
+      setSession(session);
+      if (session) await loadProfile(session.user.id);
       setLoading(false);
-    };
-
-    initAuth();
-
-    // Escuchar cambios (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user || null);
-      if (session?.user) {
-        const { data } = await supabase.from('profiles').select('rol').eq('id', session.user.id).single();
-        if (data) setRole(data.rol);
-      } else {
-        setRole(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-    */
-
-    // =========================================================
-    // MOCK TEMPORAL (Para que tu interfaz renderice mientras tanto)
-    // Borra esto cuando actives Supabase
-    // =========================================================
-    setUser({ id: "mock-id-123", email: "gerencia@elmaizalito.com" });
-    setRole("MASTER"); // Cambia esto a "COMPRAS" o "TESORERIA" para probar la UI
-    setLoading(false);
+      const res = supabase.auth.onAuthStateChange((_event, s) => {
+        setSession(s);
+        if (s) loadProfile(s.user.id); else setProfile(null);
+      });
+      subscription = res.data.subscription;
+    })();
+    return () => { if (subscription) subscription.unsubscribe(); };
   }, []);
 
-  const signOut = async () => {
-    try {
-      // await supabase.auth.signOut();
-      setUser(null);
-      setRole(null);
-    } catch (error) {
-      console.error("Error cerrando sesión:", error);
-    }
+  const value = {
+    session,
+    user: session?.user || null,
+    profile,
+    role: profile?.rol || "COMPRAS",
+    loading,
+    signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
+    signUp: (email, password) => supabase.auth.signUp({ email, password }),
+    signOut: () => supabase.auth.signOut(),
+    refreshProfile: () => session && loadProfile(session.user.id),
   };
 
-  return (
-    <AuthContext.Provider value={{ user, role, signOut }}>
-      {!loading ? (
-        children
-      ) : (
-        <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#6B7A70" }}>
-          Autenticando...
-        </div>
-      )}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Hook personalizado para consumir la autenticación
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth debe usarse dentro de un AuthProvider");
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);

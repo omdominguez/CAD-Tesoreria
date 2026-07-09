@@ -16,7 +16,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function loadState() {
   const { data, error } = await supabase
-    .from('app_state')
+    .from('workspace')
     .select('data')
     .eq('id', 1)
     .single();
@@ -30,24 +30,24 @@ export async function loadState() {
 
 export async function saveState(st, userId) {
   const { error } = await supabase
-    .from('app_state')
-    .upsert({ 
-      id: 1, 
-      data: st, 
-      actualizado_por: userId, 
-      actualizado_en: new Date().toISOString() 
-    });
+    .from('workspace')
+    .update({
+      data: st,
+      updated_by: userId || null,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', 1);
 
   if (error) throw error;
   return true;
 }
 
 export function subscribeState(callback) {
-  // Escucha cambios en tiempo real en la tabla app_state
-  const channel = supabase.channel('realtime-app-state')
+  // Escucha cambios en tiempo real en la tabla workspace
+  const channel = supabase.channel('realtime-workspace')
     .on(
       'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'app_state', filter: 'id=eq.1' },
+      { event: 'UPDATE', schema: 'public', table: 'workspace', filter: 'id=eq.1' },
       (payload) => {
         // Ejecuta el callback con el nuevo JSON recibido
         if (payload.new && payload.new.data) {
@@ -110,14 +110,9 @@ export async function uploadAdjunto(file) {
 }
 
 export async function getAdjuntoUrl(path) {
-  // Si tu bucket es público:
-  const { data } = supabase.storage.from('adjuntos').getPublicUrl(path);
-  return data.publicUrl;
-
-  /* 
-  Si tu bucket es PRIVADO, usa esto en su lugar:
+  // El bucket 'adjuntos' es privado (ver migración), así que se requiere
+  // una URL firmada con vigencia temporal en vez de una URL pública.
   const { data, error } = await supabase.storage.from('adjuntos').createSignedUrl(path, 3600); // 1 hora
   if (error) throw error;
   return data.signedUrl;
-  */
 }

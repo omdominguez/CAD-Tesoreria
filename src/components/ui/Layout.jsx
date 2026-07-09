@@ -27,8 +27,9 @@ export function Modal({ title, onClose, children, wide }) {
       style={{ 
         position: "fixed", 
         inset: 0, 
-        background: "rgba(14,17,13,0.45)", 
-        backdropFilter: "blur(2px)", 
+        background: "rgba(14,17,13,0.35)", 
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
         display: "flex", 
         alignItems: "flex-start", 
         justifyContent: "center", 
@@ -40,12 +41,14 @@ export function Modal({ title, onClose, children, wide }) {
       <div 
         onClick={(e) => e.stopPropagation()} 
         style={{ 
-          background: C.surface, 
+          background: "var(--glass-bg-strong)",
+          backdropFilter: "blur(var(--glass-blur)) saturate(180%)",
+          WebkitBackdropFilter: "blur(var(--glass-blur)) saturate(180%)",
           borderRadius: UI.RADIUS + 2, 
           width: "100%", 
           maxWidth: wide ? 900 : 480, 
-          boxShadow: UI.SHADOW_MODAL,
-          border: `1px solid ${C.line}`,
+          boxShadow: `${UI.SHADOW_MODAL}, var(--glass-highlight)`,
+          border: "1px solid var(--glass-border)",
         }}
       >
         <div style={{ 
@@ -149,34 +152,91 @@ export function Section({ title, desc, action, children, eyebrow }) {
 
 export function AppShell({ children }) {
   return (
-    <div style={{ display: "flex", height: "100vh", backgroundColor: C.body, overflow: "hidden", fontFamily: FONTS.SANS }}>
+    <div style={{ display: "flex", height: "100vh", backgroundColor: C.body, overflow: "hidden", fontFamily: FONTS.SANS, position: "relative" }}>
+      {/* Manchas de color detrás del sidebar/topbar: son lo que el
+          desenfoque translúcido (liquid glass) deja ver a través. */}
+      <div className="cad-glass-blob cad-glass-blob-a" />
+      <div className="cad-glass-blob cad-glass-blob-b" />
       {children}
     </div>
   );
 }
 
-export function Sidebar({ open, children }) {
+export function Sidebar({ open, mobile, children }) {
+  if (mobile) {
+    return (
+      <div
+        className="cad-sidebar-mobile"
+        style={{
+          position: "fixed",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: "min(82vw, 288px)",
+          transform: open ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.25s ease",
+          background: "var(--glass-bg-strong)",
+          backdropFilter: "blur(var(--glass-blur)) saturate(180%)",
+          WebkitBackdropFilter: "blur(var(--glass-blur)) saturate(180%)",
+          borderRight: "1px solid var(--glass-border)",
+          boxShadow: open ? "0 0 40px rgba(0,0,0,0.25)" : "none",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          overflowY: "auto",
+          zIndex: 40,
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div style={{ 
       width: open ? 252 : 0, 
       transition: "width 0.2s ease", 
-      backgroundColor: C.body, 
-      borderRight: `1px solid ${C.line}`,
+      background: "var(--glass-bg)",
+      backdropFilter: "blur(var(--glass-blur)) saturate(180%)",
+      WebkitBackdropFilter: "blur(var(--glass-blur)) saturate(180%)",
+      borderRight: "1px solid var(--glass-border)",
+      boxShadow: "var(--glass-highlight)",
       display: "flex",
       flexDirection: "column",
       justifyContent: "space-between",
       overflow: "hidden",
       whiteSpace: "nowrap",
-      flexShrink: 0
+      flexShrink: 0,
+      position: "relative",
+      zIndex: 1,
     }}>
       {children}
     </div>
   );
 }
 
+/** Fondo oscuro y difuminado detrás del sidebar móvil; al tocarlo, se cierra. */
+export function SidebarBackdrop({ show, onClose }) {
+  if (!show) return null;
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,12,8,0.4)",
+        backdropFilter: "blur(2px)",
+        WebkitBackdropFilter: "blur(2px)",
+        zIndex: 35,
+      }}
+    />
+  );
+}
+
 export function SidebarItem({ act, onClick, children, style }) {
   return (
     <button 
+      className="cad-sidebar-item"
       onClick={onClick}
       style={{
         display: "flex",
@@ -187,14 +247,15 @@ export function SidebarItem({ act, onClick, children, style }) {
         borderRadius: UI.RADIUS_SM,
         border: "none",
         borderLeft: act ? `2px solid ${C.green}` : "2px solid transparent",
-        backgroundColor: act ? C.surface : "transparent",
-        boxShadow: act ? UI.SHADOW : "none",
+        // El fondo solo se fija en línea cuando el ítem está activo;
+        // si no, lo controla el CSS (.cad-sidebar-item:hover) para
+        // permitir el efecto de pasar el mouse por encima.
+        ...(act ? { backgroundColor: C.surface, boxShadow: UI.SHADOW } : {}),
         color: act ? C.ink : C.mut,
         fontWeight: act ? 700 : 500,
         fontSize: 13.5,
         cursor: "pointer",
         textAlign: "left",
-        transition: "background-color .12s, color .12s",
         fontFamily: FONTS.SANS,
         ...style
       }}
@@ -212,6 +273,7 @@ export function MainContent({ children }) {
       flexDirection: "column",
       overflowY: "auto",
       position: "relative",
+      zIndex: 1,
       backgroundColor: C.paper,
     }}>
       {children}
@@ -226,8 +288,11 @@ export function TopBar({ children }) {
       justifyContent: "space-between",
       alignItems: "center",
       padding: "12px 24px",
-      backgroundColor: C.surface,
-      borderBottom: `1px solid ${C.line}`,
+      background: "var(--glass-bg-strong)",
+      backdropFilter: "blur(var(--glass-blur)) saturate(180%)",
+      WebkitBackdropFilter: "blur(var(--glass-blur)) saturate(180%)",
+      borderBottom: "1px solid var(--glass-border)",
+      boxShadow: "var(--glass-highlight)",
       minHeight: 58,
       position: "sticky",
       top: 0,

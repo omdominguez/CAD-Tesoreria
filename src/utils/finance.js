@@ -33,6 +33,78 @@ export function startWeek(d) {
 }
 
 /* ============================================================
+   HISTÓRICO Y VARIACIÓN DE TASAS DE CAMBIO
+   ------------------------------------------------------------
+   Cada vez que se edita una tasa se guarda un "cierre del día"
+   en st.historialTasas (una foto de las 3 tasas por fecha).
+   Con eso se puede comparar el valor actual contra el cierre
+   del día hábil anterior, como en un ticker bursátil.
+   ============================================================ */
+export const hoyStr = () => new Date().toISOString().slice(0, 10);
+
+const TASAS_KEYS = ["tasaBCV", "tasaIntervencion", "tasaParalelo"];
+
+/** Devuelve un nuevo estado con la foto de hoy actualizada en historialTasas. */
+export function conSnapshotDeHoy(state) {
+  const hoy = hoyStr();
+  const snap = {};
+  TASAS_KEYS.forEach((k) => { snap[k] = Number(state.config?.[k]) || 0; });
+  return {
+    ...state,
+    historialTasas: { ...(state.historialTasas || {}), [hoy]: snap },
+  };
+}
+
+/** Busca la fecha más reciente registrada en el historial anterior a hoy. */
+function fechaAnteriorMasReciente(historial) {
+  const hoy = hoyStr();
+  const fechas = Object.keys(historial || {}).filter((f) => f < hoy).sort();
+  return fechas.length ? fechas[fechas.length - 1] : null;
+}
+
+/**
+ * Devuelve, para cada una de las 3 tasas, su valor actual, el valor de
+ * cierre del día anterior registrado, la variación absoluta y el
+ * porcentaje de cambio (como en un ticker de bolsa).
+ */
+export function variacionTasas(state) {
+  const cfg = state.config || {};
+  const historial = state.historialTasas || {};
+  const fechaBase = fechaAnteriorMasReciente(historial);
+  const base = fechaBase ? historial[fechaBase] : null;
+
+  const LABELS = { tasaBCV: "BCV", tasaIntervencion: "Intervención", tasaParalelo: "Paralelo" };
+
+  return TASAS_KEYS.map((k) => {
+    const valor = Number(cfg[k]) || 0;
+    const anterior = base ? Number(base[k]) || 0 : null;
+    const cambio = anterior !== null ? valor - anterior : null;
+    const pct = anterior && anterior > 0 ? (cambio / anterior) * 100 : null;
+    return { key: k, label: LABELS[k], valor, anterior, cambio, pct };
+  });
+}
+
+/**
+ * Compara las 3 tasas entre sí (no contra el día anterior, sino unas
+ * con otras): cuánto más cara es la paralela que la BCV, etc. Útil
+ * para dimensionar de un vistazo la brecha cambiaria del día.
+ */
+export function comparativaEntreTasas(state) {
+  const cfg = state.config || {};
+  const bcv = Number(cfg.tasaBCV) || 0;
+  const interv = Number(cfg.tasaIntervencion) || 0;
+  const paralelo = Number(cfg.tasaParalelo) || 0;
+
+  const brecha = (base, comparado) => (base > 0 ? ((comparado - base) / base) * 100 : null);
+
+  return [
+    { key: "interv-bcv", label: "Intervención vs BCV", pct: brecha(bcv, interv) },
+    { key: "paralelo-bcv", label: "Paralelo vs BCV", pct: brecha(bcv, paralelo) },
+    { key: "paralelo-interv", label: "Paralelo vs Intervención", pct: brecha(interv, paralelo) },
+  ];
+}
+
+/* ============================================================
    BÚSQUEDAS BÁSICAS
    ============================================================ */
 export const eqUSD = (bs, tasa) => (Number(tasa) && Number(tasa) > 0 ? Number(bs) / Number(tasa) : 0);

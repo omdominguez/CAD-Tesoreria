@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   LayoutDashboard, 
   Users, 
@@ -17,9 +17,11 @@ import { useAuth } from "./services/auth";
 import { C, FONTS } from "./constants/theme";
 
 // Componentes UI de Layout Global
-import { AppShell, Sidebar, TopBar, MainContent, SidebarItem } from "./components/ui/Layout";
+import { AppShell, Sidebar, SidebarBackdrop, TopBar, MainContent, SidebarItem } from "./components/ui/Layout";
 import { Btn } from "./components/ui/Buttons";
 import { ThemeToggle } from "./components/ui/ThemeToggle";
+import { TickerTasas } from "./components/shared/TickerTasas";
+import { useIsMobile } from "./hooks/useIsMobile";
 
 // Vistas Principales (Los módulos que creamos)
 import Tablero from "./views/Tablero/Tablero";
@@ -30,8 +32,17 @@ import ModuloAjustes from "./views/Ajustes/ModuloAjustes";
 
 export default function Workspace({ st, act }) {
   const { user, role, signOut } = useAuth();
+  const isMobile = useIsMobile();
   const [modulo, setModulo] = useState("tablero");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => !isMobile);
+
+  // En móvil el sidebar arranca cerrado (es un panel superpuesto);
+  // en escritorio arranca abierto (empuja el contenido).
+  useEffect(() => { setSidebarOpen(!isMobile); }, [isMobile]);
+
+  // Navegar a un módulo: en móvil, además cierra el panel para
+  // que el usuario vea de una vez la vista elegida.
+  const ir = (m) => { setModulo(m); if (isMobile) setSidebarOpen(false); };
 
   // Mapeo semántico de los nombres de los roles para mostrar en el TopBar
   const ROL_LBL = {
@@ -42,8 +53,11 @@ export default function Workspace({ st, act }) {
 
   return (
     <AppShell>
+      {/* Fondo oscuro detrás del sidebar cuando es un panel móvil superpuesto */}
+      <SidebarBackdrop show={isMobile && sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
       {/* 1. BARRA LATERAL DE NAVEGACIÓN (SIDEBAR) */}
-      <Sidebar open={sidebarOpen}>
+      <Sidebar open={sidebarOpen} mobile={isMobile}>
         <div>
           {/* Logo o Cabecera del Sistema */}
           <div style={{ padding: "20px 16px", borderBottom: `1px solid ${C.line}`, marginBottom: 16 }}>
@@ -57,30 +71,30 @@ export default function Workspace({ st, act }) {
 
           {/* Items de Navegación según Rol */}
           <div style={{ display: "grid", gap: 4, padding: "0 8px" }}>
-            <SidebarItem act={modulo === "tablero"} onClick={() => setModulo("tablero")}>
+            <SidebarItem act={modulo === "tablero"} onClick={() => ir("tablero")}>
               <LayoutDashboard size={16} /> Tablero Principal
             </SidebarItem>
 
-            <SidebarItem act={modulo === "directorio"} onClick={() => setModulo("directorio")}>
+            <SidebarItem act={modulo === "directorio"} onClick={() => ir("directorio")}>
               <Users size={16} /> Directorio
             </SidebarItem>
 
             {/* Compras: Accesible por Compras y Gerencia (Master) */}
             {(role === "COMPRAS" || role === "MASTER") && (
-              <SidebarItem act={modulo === "compras"} onClick={() => setModulo("compras")}>
+              <SidebarItem act={modulo === "compras"} onClick={() => ir("compras")}>
                 <ShoppingCart size={16} /> Módulo Compras
               </SidebarItem>
             )}
 
             {/* Tesorería: Accesible por Tesorería y Gerencia (Master) */}
             {(role === "TESORERIA" || role === "MASTER") && (
-              <SidebarItem act={modulo === "tesoreria"} onClick={() => setModulo("tesoreria")}>
+              <SidebarItem act={modulo === "tesoreria"} onClick={() => ir("tesoreria")}>
                 <Wallet size={16} /> Módulo Tesorería
               </SidebarItem>
             )}
 
             {/* Ajustes: Accesible por todos (cada subpestaña filtrará internamente) */}
-            <SidebarItem act={modulo === "ajustes"} onClick={() => setModulo("ajustes")}>
+            <SidebarItem act={modulo === "ajustes"} onClick={() => ir("ajustes")}>
               <Settings size={16} /> Ajustes del Sistema
             </SidebarItem>
           </div>
@@ -104,25 +118,38 @@ export default function Workspace({ st, act }) {
       <MainContent sidebarOpen={sidebarOpen}>
         {/* Barra Superior Informativa */}
         <TopBar>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Btn small variant="ghost" onClick={() => setSidebarOpen(!sidebarOpen)} style={{ padding: 6 }}>
-              {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12, minWidth: 0, flex: 1 }}>
+            <Btn small variant="ghost" onClick={() => setSidebarOpen(!sidebarOpen)} style={{ padding: 6, flexShrink: 0 }}>
+              {sidebarOpen && !isMobile ? <X size={18} /> : <Menu size={18} />}
             </Btn>
-            <div style={{ fontSize: 13, color: C.mut, fontWeight: 500 }}>
-              Tasa BCV del día: <b style={{ color: C.ink, fontVariantNumeric: "tabular-nums" }}>Bs {Number(st.config?.tasaBCV || 0).toFixed(2)}</b>
-            </div>
+            <TickerTasas st={st} />
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12, textAlign: "right" }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{user?.email}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: C.mut }}>{ROL_LBL[role] || "Usuario"}</div>
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, textAlign: "right", flexShrink: 0 }}>
+            {!isMobile && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{user?.email}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: C.mut }}>{ROL_LBL[role] || "Usuario"}</div>
+              </div>
+            )}
+            {isMobile && (
+              <div
+                title={user?.email}
+                style={{
+                  width: 30, height: 30, borderRadius: 999,
+                  background: C.greenSoft, color: C.greenDk,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 13, fontWeight: 800, fontFamily: FONTS.SANS,
+                }}
+              >
+                {(user?.email || "?").charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
         </TopBar>
 
         {/* Renderizado Dinámico de Vistas según el estado 'modulo' */}
-        <div style={{ padding: "4px 0" }}>
+        <div style={{ padding: isMobile ? "4px 14px 32px" : "4px 24px 40px" }}>
           {modulo === "tablero" && <Tablero st={st} />}
           {modulo === "directorio" && <Directorio st={st} />}
           {modulo === "compras" && (role === "COMPRAS" || role === "MASTER") && (

@@ -40,6 +40,15 @@
   --mut-soft: #EEF1EC;
   --rojo-line: #EDD3D0;
 
+  /* Liquid glass: superficies translÃºcidas con desenfoque */
+  --glass-bg: rgba(255,255,255,0.62);
+  --glass-bg-strong: rgba(255,255,255,0.78);
+  --glass-border: rgba(255,255,255,0.55);
+  --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.7);
+  --glass-blur: 22px;
+  --blob-a: rgba(20,83,43,0.30);
+  --blob-b: rgba(169,116,10,0.24);
+
   --shadow: 0 1px 2px rgba(18,20,15,0.03);
   --shadow-modal: 0 24px 60px rgba(10,14,10,0.20);
 
@@ -76,6 +85,15 @@
     --mut-soft: #262920;
     --rojo-line: #4A2C2A;
 
+    /* Liquid glass en modo oscuro */
+    --glass-bg: rgba(28,30,24,0.55);
+    --glass-bg-strong: rgba(28,30,24,0.72);
+    --glass-border: rgba(255,255,255,0.08);
+    --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.06);
+    --glass-blur: 22px;
+    --blob-a: rgba(76,154,106,0.26);
+    --blob-b: rgba(214,168,74,0.18);
+
     --shadow: 0 1px 2px rgba(0,0,0,0.28);
     --shadow-modal: 0 24px 60px rgba(0,0,0,0.55);
 
@@ -111,6 +129,15 @@
   --azul-soft: #1B2740;
   --mut-soft: #262920;
   --rojo-line: #4A2C2A;
+
+  /* Liquid glass en modo oscuro */
+  --glass-bg: rgba(28,30,24,0.55);
+  --glass-bg-strong: rgba(28,30,24,0.72);
+  --glass-border: rgba(255,255,255,0.08);
+  --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.06);
+  --glass-blur: 22px;
+  --blob-a: rgba(76,154,106,0.26);
+  --blob-b: rgba(214,168,74,0.18);
 
   --shadow: 0 1px 2px rgba(0,0,0,0.28);
   --shadow-modal: 0 24px 60px rgba(0,0,0,0.55);
@@ -156,4 +183,48 @@ body {
   :root:not([data-theme="light"]):not([data-theme="dark"]) .cad-btn:hover {
     filter: brightness(1.12);
   }
+}
+
+/* ------------------------------------------------------------
+   Liquid glass â€” manchas de color decorativas detrÃ¡s del sidebar
+   y la barra superior, para que el desenfoque translÃºcido tenga
+   algo de color que desenfocar (igual que los fondos de Apple).
+   ------------------------------------------------------------ */
+.cad-glass-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+}
+.cad-glass-blob-a {
+  width: 420px;
+  height: 420px;
+  top: -120px;
+  left: -140px;
+  background: var(--blob-a);
+}
+.cad-glass-blob-b {
+  width: 380px;
+  height: 380px;
+  bottom: -140px;
+  left: -80px;
+  background: var(--blob-b);
+}
+
+/* ------------------------------------------------------------
+   Ticker de tasas (estilo bolsa de valores)
+   ------------------------------------------------------------ */
+.cad-ticker-track {
+  animation: cad-ticker-scroll 22s linear infinite;
+  will-change: transform;
+}
+.cad-ticker:hover .cad-ticker-track {
+  animation-play-state: paused;
+}
+@keyframes cad-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cad-ticker-track { animation: none; }
 }

@@ -11,9 +11,13 @@ import Workspace from "./Workspace";
 // Constantes de Diseño Base
 import { C } from "./constants/theme";
 
+// Histórico de tasas (para el ticker estilo bolsa de valores)
+import { conSnapshotDeHoy, hoyStr } from "./utils/finance";
+
 // El estado inicial por defecto si la base de datos está totalmente vacía
 const EMPTY_STATE = {
   config: { tasaBCV: "1.00", tasaIntervencion: "1.00", tasaParalelo: "1.00" },
+  historialTasas: {},
   bancos: [],
   proveedores: [],
   compromisos: [],
@@ -43,8 +47,15 @@ function InnerApp() {
     // Carga inicial del JSON desde la tabla 'app_state'
     loadState()
       .then((dbState) => {
-        setSt(dbState || EMPTY_STATE);
+        const base = dbState || EMPTY_STATE;
+        // Si hoy todavía no tiene una foto de las tasas guardada, la registramos
+        // ahora mismo (así el ticker siempre tiene con qué comparar el día
+        // anterior, incluso si nadie editó las tasas hoy).
+        const yaTieneHoy = Boolean(base.historialTasas?.[hoyStr()]);
+        const conHistorial = yaTieneHoy ? base : conSnapshotDeHoy(base);
+        setSt(conHistorial);
         setStoreLoading(false);
+        if (!yaTieneHoy) saveState(conHistorial, user.id).catch(console.error);
       })
       .catch((err) => {
         console.error("Error crítico cargando estado:", err);
@@ -68,7 +79,8 @@ function InnerApp() {
     // === CONFIGURACIÓN ===
     setRate: (key, val) => {
       setSt((prev) => {
-        const next = { ...prev, config: { ...prev.config, [key]: val } };
+        const conConfig = { ...prev, config: { ...prev.config, [key]: val } };
+        const next = conSnapshotDeHoy(conConfig);
         saveState(next, user.id).catch(console.error);
         return next;
       });

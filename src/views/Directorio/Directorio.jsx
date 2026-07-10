@@ -40,7 +40,7 @@ export default function Directorio({ st }) {
 
   return (
     <Section 
-      title="Directorio de Contactos" 
+      title="Cartera de Contactos" 
       desc="Busca un proveedor o cliente para ver sus saldos y su estado de cuenta detallado."
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
@@ -68,7 +68,7 @@ export default function Directorio({ st }) {
       {(st.proveedores || []).length === 0 ? (
         <Empty 
           icon={Users} 
-          title="Directorio vacío" 
+          title="Cartera vacía" 
           msg="Ve a Ajustes para registrar empresas o personas." 
         />
       ) : (

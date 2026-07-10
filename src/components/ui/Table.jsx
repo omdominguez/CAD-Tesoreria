@@ -31,7 +31,7 @@ export function Td({ children, right, bold }) {
       textAlign: right ? "right" : "left", 
       fontSize: 13, 
       padding: "11px 14px", 
-      borderBottom: `1px solid ${C.line}`, 
+      borderBottom: `1px solid ${C.lineStrong}`, 
       color: C.ink, 
       fontWeight: bold ? 700 : 400, 
       fontVariantNumeric: "tabular-nums" 

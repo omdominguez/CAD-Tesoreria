@@ -1,44 +1,171 @@
 import React, { useState, useMemo } from "react";
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  ArrowDownLeft, 
-  ArrowUpRight, 
-  TrendingUp, 
-  Sparkles 
+import {
+  LayoutDashboard,
+  Wallet,
+  ArrowDownLeft,
+  ArrowUpRight,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
+  ShieldCheck,
+  AlertTriangle,
+  Landmark
 } from "lucide-react";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  ResponsiveContainer, 
-  CartesianGrid 
+import {
+  ComposedChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid
 } from "recharts";
 
 // Utilidades y Tema
 import { C, FONTS } from "../../constants/theme";
-import { 
-  brutoUSD, 
-  activo, 
-  usdComp, 
-  activoCxC, 
-  usdCxCPendiente, 
-  hoy0, 
-  startWeek, 
-  diasEntre, 
-  parseD, 
-  money, 
-  eqUSD, 
-  comprometidoBanco 
+import {
+  brutoUSD,
+  activo,
+  usdComp,
+  activoCxC,
+  usdCxCPendiente,
+  hoy0,
+  startWeek,
+  diasEntre,
+  parseD,
+  money,
+  nf,
+  eqUSD,
+  comprometidoBanco
 } from "../../utils/finance";
 
 // Componentes UI
-import { Card, Empty } from "../../components/ui/Layout";
+import { Section, Card, Empty } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
-import { KpiCard, Badge } from "../../components/ui/Data";
-import { Th, Td } from "../../components/ui/Table";
+import { Badge } from "../../components/ui/Data";
+import VariacionMensualBCV from "./VariacionMensualBCV";
+import { logoUrlDeBanco, logoRespaldoDeBanco } from "../../utils/bancoLogos";
+
+/* ============================================================
+   Franja de KPIs: una sola tarjeta dividida por líneas finas,
+   en vez de 4 tarjetas sueltas — se ve más unificado.
+   ============================================================ */
+function KpiStrip({ items }) {
+  return (
+    <Card style={{ padding: 0, marginBottom: 16, overflow: "hidden" }}>
+      <div style={{ display: "flex", flexWrap: "wrap" }}>
+        {items.map((it, i) => (
+          <div
+            key={it.t}
+            style={{
+              flex: "1 1 210px",
+              minWidth: 190,
+              padding: "18px 20px",
+              borderRight: i < items.length - 1 ? `1px solid ${C.line}` : "none",
+              borderBottom: "1px solid transparent"
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 7, background: C.body, display: "inline-flex", alignItems: "center", justifyContent: "center", color: it.tone, flexShrink: 0 }}>
+                <it.ic size={14} />
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                {it.t}
+              </div>
+            </div>
+
+            <div style={{ fontFamily: FONTS.SANS, fontSize: 25, fontWeight: 800, color: C.ink, letterSpacing: -0.5, fontVariantNumeric: "tabular-nums" }}>
+              {money(it.v, "USD")}
+            </div>
+            <div style={{ width: 28, height: 3, borderRadius: 999, background: it.tone, marginTop: 8, marginBottom: 8 }} />
+            <div style={{ fontSize: 11.5, color: C.mut }}>{it.sub}</div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/** Avatar circular del banco: Clearbit → favicon de Google → iniciales. */
+function AvatarBanco({ nombre }) {
+  const [etapa, setEtapa] = useState("clearbit"); // 'clearbit' | 'favicon' | 'iniciales'
+  const iniciales = (nombre || "??").trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+
+  const logoUrl = etapa === "clearbit" ? logoUrlDeBanco(nombre) : etapa === "favicon" ? logoRespaldoDeBanco(nombre) : null;
+
+  if (logoUrl) {
+    return (
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fff", border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
+        <img
+          src={logoUrl}
+          alt=""
+          onError={() => setEtapa((e) => (e === "clearbit" ? "favicon" : "iniciales"))}
+          style={{ width: "100%", height: "100%", objectFit: "contain", padding: etapa === "clearbit" ? 4 : 8 }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width: 36, height: 36, borderRadius: 10, background: C.greenSoft, color: C.greenDk, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
+      {iniciales}
+    </div>
+  );
+}
+
+/** Tarjeta individual de banco (en vez de fila de tabla). */
+function TarjetaBanco({ b, st }) {
+  const comp = comprometidoBanco(st, b);
+  const neto = Number(b.saldoActual) - comp;
+  const esUSD = b.moneda === "USD";
+  const bruto = Number(b.saldoActual) || 0;
+  const pctComprometido = bruto > 0 ? Math.min(100, (comp / bruto) * 100) : 0;
+  const barColor = pctComprometido >= 90 ? C.rojo : pctComprometido >= 60 ? C.gold : C.verde;
+
+  return (
+    <Card style={{ padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <AvatarBanco nombre={b.nombre} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 13.5, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {b.nombre}
+          </div>
+          <div style={{ fontSize: 11, color: C.mut }}>bruto {money(b.saldoActual, b.moneda)}</div>
+        </div>
+        <Badge tone="mut">{b.moneda}</Badge>
+      </div>
+
+      <div style={{ fontFamily: FONTS.SANS, fontSize: 22, fontWeight: 800, letterSpacing: -0.4, color: neto >= 0 ? C.verde : C.rojo, fontVariantNumeric: "tabular-nums" }}>
+        {money(neto, b.moneda)}
+      </div>
+      <div style={{ fontSize: 11, color: C.mut, marginTop: 2, marginBottom: 8 }}>disponible neto</div>
+
+      <div style={{ width: "100%", height: 5, borderRadius: 999, background: C.body, overflow: "hidden", marginBottom: 4 }}>
+        <div style={{ width: `${pctComprometido}%`, height: "100%", background: barColor, borderRadius: 999 }} />
+      </div>
+      <div style={{ fontSize: 10.5, color: C.mut2, marginBottom: esUSD ? 0 : 12 }}>
+        {nf.format(pctComprometido)}% comprometido · {money(comp, b.moneda)}
+      </div>
+
+      {!esUSD && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, paddingTop: 10, borderTop: `1px dashed ${C.line}` }}>
+          <div>
+            <div style={{ fontSize: 9.5, color: C.mut, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3 }}>BCV</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{money(eqUSD(neto, st.config.tasaBCV), "USD")}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9.5, color: C.mut, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3 }}>Interv.</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{money(eqUSD(neto, st.config.tasaIntervencion), "USD")}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9.5, color: C.mut, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3 }}>Paralelo</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{money(eqUSD(neto, st.config.tasaParalelo), "USD")}</div>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 export default function Tablero({ st }) {
   const [semanas, setSemanas] = useState(12);
@@ -50,44 +177,60 @@ export default function Tablero({ st }) {
     const comp = (st.compromisos || [])
       .filter((c) => activo(st, c) && !(estres && c.prioridad === "FLEXIBLE"))
       .reduce((a, c) => a + usdComp(st, c), 0);
-      
+
     const cobrar = (st.cuentasCobrar || [])
       .filter((c) => activoCxC(st, c))
       .reduce((a, c) => a + usdCxCPendiente(st, c), 0);
-      
+
     return { disp, comp, cobrar, neto: disp + cobrar - comp };
   }, [st, estres]);
 
+  // Cobertura: qué tanto de lo pendiente por pagar cubre lo que ya tienes disponible
+  const cobertura = useMemo(() => {
+    if (kpi.comp <= 0) return null;
+    const pct = (kpi.disp / kpi.comp) * 100;
+    let tono, Icono, mensaje;
+    if (pct >= 100) {
+      tono = C.verde; Icono = ShieldCheck;
+      mensaje = `Tu disponible en bancos cubre el ${Math.round(pct)}% de tus pagos pendientes — estás cubierto sin necesidad de cobrar.`;
+    } else if (pct + (kpi.cobrar / kpi.comp) * 100 >= 100) {
+      tono = C.amar; Icono = TrendingUp;
+      mensaje = `Tu disponible cubre el ${Math.round(pct)}% de tus pagos pendientes; sumando lo por cobrar, alcanzas a cubrir el resto.`;
+    } else {
+      tono = C.rojo; Icono = AlertTriangle;
+      mensaje = `Tu disponible + por cobrar solo cubre el ${Math.round(pct + (kpi.cobrar / kpi.comp) * 100)}% de tus pagos pendientes. Revisa prioridades en Compras.`;
+    }
+    return { pct, tono, Icono, mensaje };
+  }, [kpi]);
+
   // Proyección del Flujo de Caja
   const proj = useMemo(() => {
-    const t = hoy0(); 
+    const t = hoy0();
     const w0 = startWeek(t);
     const arr = Array.from({ length: semanas }, (_, i) => ({ name: "S" + (i + 1), ingreso: 0, egreso: 0 }));
     let vEg = 0, vIn = 0;
-    
-    // Egresos proyectados
+
     (st.compromisos || [])
       .filter((c) => activo(st, c) && !(estres && c.prioridad === "FLEXIBLE"))
       .forEach((c) => {
         const idx = Math.floor(diasEntre(w0, parseD(c.fechaVencimiento)) / 7);
-        const v = usdComp(st, c); 
-        
-        if (idx < 0) vEg += v; 
+        const v = usdComp(st, c);
+        if (idx < 0) vEg += v;
         else if (idx < semanas) arr[idx].egreso += v;
       });
-      
-    // Ingresos proyectados
+
     (st.cuentasCobrar || [])
       .filter((c) => activoCxC(st, c))
       .forEach((c) => {
         const idx = Math.floor(diasEntre(w0, parseD(c.fechaVencimiento)) / 7);
-        const v = usdCxCPendiente(st, c); 
-        
-        if (idx < 0) vIn += v; 
+        const v = usdCxCPendiente(st, c);
+        if (idx < 0) vIn += v;
         else if (idx < semanas) arr[idx].ingreso += v;
       });
-      
-    return [{ name: "Venc.", ingreso: vIn, egreso: vEg }, ...arr];
+
+    const conNeto = [{ name: "Venc.", ingreso: vIn, egreso: vEg }, ...arr];
+    conNeto.forEach((r) => { r.neto = r.ingreso - r.egreso; });
+    return conNeto;
   }, [st, semanas, estres]);
 
   const totIn = proj.reduce((a, r) => a + r.ingreso, 0);
@@ -95,32 +238,48 @@ export default function Tablero({ st }) {
 
   if ((st.bancos || []).length === 0 && (st.proveedores || []).length === 0) {
     return (
-      <Empty 
-        icon={LayoutDashboard} 
-        title="Aún no hay datos operativos" 
-        msg="Ve a Ajustes y registra bancos y contactos para comenzar a proyectar tu caja." 
-      />
+      <Section title="Tablero Principal" eyebrow="Resumen general">
+        <Empty
+          icon={LayoutDashboard}
+          title="Aún no hay datos operativos"
+          msg="Ve a Ajustes y registra bancos y contactos para comenzar a proyectar tu caja."
+        />
+      </Section>
     );
   }
 
-  return (
-    <div>
-      {/* 1. Tarjetas Superiores (KPIs) */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 14, marginBottom: 16 }}>
-        <KpiCard t="Disponible en bancos" v={kpi.disp} ic={Wallet} tone={C.green} sub="Saldo bruto consolidado (USD)" />
-        <KpiCard t="Por cobrar" v={kpi.cobrar} ic={ArrowDownLeft} tone={C.verde} sub="Facturas de clientes (USD)" />
-        <KpiCard t="Por pagar" v={kpi.comp} ic={ArrowUpRight} tone={C.gold} sub="Egresos pendientes (USD)" />
-        <KpiCard t="Posición neta" v={kpi.neto} ic={TrendingUp} tone={kpi.neto >= 0 ? C.verde : C.rojo} sub="Disponible + por cobrar − por pagar" />
-      </div>
+  const kpiItems = [
+    { t: "Disponible en bancos", v: kpi.disp, ic: Wallet, tone: C.green, sub: "Saldo bruto consolidado (USD)" },
+    { t: "Por cobrar", v: kpi.cobrar, ic: ArrowDownLeft, tone: C.verde, sub: "Facturas de clientes (USD)" },
+    { t: "Por pagar", v: kpi.comp, ic: ArrowUpRight, tone: C.gold, sub: "Egresos pendientes (USD)" },
+    { t: "Posición neta", v: kpi.neto, ic: kpi.neto >= 0 ? TrendingUp : TrendingDown, tone: kpi.neto >= 0 ? C.verde : C.rojo, sub: "Disponible + por cobrar − por pagar" }
+  ];
 
-      {/* 2. Gráfica de Proyección */}
+  return (
+    <Section title="Tablero Principal" eyebrow="Resumen general" desc="Vista consolidada de tu posición de caja, proyección de pagos y saldos por banco.">
+      {/* 0. Lectura rápida de cobertura */}
+      {cobertura && (
+        <Card style={{ padding: "14px 18px", marginBottom: 16, borderLeft: `3px solid ${cobertura.tono}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: C.body, display: "flex", alignItems: "center", justifyContent: "center", color: cobertura.tono, flexShrink: 0 }}>
+              <cobertura.Icono size={17} />
+            </div>
+            <div style={{ fontSize: 13, color: C.ink, lineHeight: 1.4 }}>{cobertura.mensaje}</div>
+          </div>
+        </Card>
+      )}
+
+      {/* 1. KPIs unificados */}
+      <KpiStrip items={kpiItems} />
+
+      {/* 2. Gráfica de Proyección (con línea de balance neto superpuesta) */}
       <Card style={{ padding: 20, marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
           <div>
-            <div style={{ fontFamily: FONTS.SERIF, fontSize: 18, fontWeight: 700, color: C.greenDk }}>
+            <div style={{ fontFamily: FONTS.SANS, fontSize: 16, fontWeight: 800, color: C.ink, letterSpacing: -0.3 }}>
               Proyección de flujo de caja
             </div>
-            <div style={{ fontSize: 12.5, color: C.mut }}>
+            <div style={{ fontSize: 12.5, color: C.mut, marginTop: 2 }}>
               Ingresos por cobrar vs. egresos por pagar, por semana (USD)
             </div>
           </div>
@@ -129,103 +288,65 @@ export default function Tablero({ st }) {
             <Btn small variant={semanas === 12 ? "primary" : "ghost"} onClick={() => setSemanas(12)}>12 sem</Btn>
           </div>
         </div>
-        
-        <div style={{ display: "flex", gap: 20, margin: "10px 0 4px", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <span style={{ width: 11, height: 11, borderRadius: 3, background: C.verde }} />
-            <span style={{ fontSize: 12.5, color: C.mut }}>Ingresos <b style={{ color: C.verde }}>{money(totIn)}</b></span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <span style={{ width: 11, height: 11, borderRadius: 3, background: C.gold }} />
-            <span style={{ fontSize: 12.5, color: C.mut }}>Egresos <b style={{ color: C.gold }}>{money(totEg)}</b></span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <span style={{ fontSize: 12.5, color: C.mut }}>
-              Balance del período <b style={{ color: (totIn - totEg) >= 0 ? C.verde : C.rojo }}>{money(totIn - totEg)}</b>
-            </span>
-          </div>
+
+        <div style={{ display: "flex", gap: 10, margin: "12px 0 4px", flexWrap: "wrap" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.body, borderRadius: 999, padding: "4px 10px 4px 8px", fontSize: 11.5, color: C.mut }}>
+            <span style={{ width: 9, height: 9, borderRadius: 3, background: C.verde }} />
+            Ingresos <b style={{ color: C.ink }}>{money(totIn)}</b>
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.body, borderRadius: 999, padding: "4px 10px 4px 8px", fontSize: 11.5, color: C.mut }}>
+            <span style={{ width: 9, height: 9, borderRadius: 3, background: C.gold }} />
+            Egresos <b style={{ color: C.ink }}>{money(totEg)}</b>
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.body, borderRadius: 999, padding: "4px 10px", fontSize: 11.5, color: C.mut }}>
+            Balance del período <b style={{ color: (totIn - totEg) >= 0 ? C.verde : C.rojo }}>{money(totIn - totEg)}</b>
+          </span>
         </div>
-        
-        <div style={{ height: 250, marginTop: 8 }}>
+
+        <div style={{ height: 250, marginTop: 10 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={proj} margin={{ top: 6, right: 6, left: -12, bottom: 0 }} barGap={2}>
+            <ComposedChart data={proj} margin={{ top: 6, right: 6, left: -12, bottom: 0 }} barGap={3} barCategoryGap="28%">
               <CartesianGrid strokeDasharray="3 3" stroke={C.line} vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: C.mut }} interval={0} />
-              <YAxis tick={{ fontSize: 10, fill: C.mut }} tickFormatter={(v) => (v >= 1000 ? (v / 1000).toFixed(0) + "k" : v)} />
-              <Tooltip 
-                formatter={(v, n) => [money(v, "USD"), n === "ingreso" ? "Ingresos" : "Egresos"]} 
-                labelStyle={{ color: C.ink }} 
-                contentStyle={{ fontSize: 12, borderRadius: 10, border: `1px solid ${C.line}` }} 
+              <YAxis tick={{ fontSize: 10, fill: C.mut }} tickFormatter={(v) => (v >= 1000 || v <= -1000 ? (v / 1000).toFixed(0) + "k" : v)} />
+              <Tooltip
+                formatter={(v, n) => [money(v, "USD"), n === "ingreso" ? "Ingresos" : "Egresos"]}
+                labelStyle={{ color: C.ink }}
+                contentStyle={{ fontSize: 12, borderRadius: 10, border: `1px solid ${C.line}`, background: C.surface }}
               />
-              <Bar dataKey="ingreso" fill={C.verde} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="egreso" fill={C.gold} radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Bar dataKey="ingreso" name="ingreso" fill={C.verde} radius={[3, 3, 0, 0]} maxBarSize={26} minPointSize={2} />
+              <Bar dataKey="egreso" name="egreso" fill={C.gold} radius={[3, 3, 0, 0]} maxBarSize={26} minPointSize={2} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
-        
-        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
           <input type="checkbox" checked={estres} onChange={(e) => setEstres(e.target.checked)} />
           <Sparkles size={14} color={C.gold} /> Simular escenario: excluir egresos marcados como flexibles
         </label>
       </Card>
 
-      {/* 3. Tabla de Saldos Bancarios Consolidados */}
+      {/* 3. Saldos por banco: tarjetas en vez de tabla */}
       {(st.bancos || []).length > 0 && (
-        <Card style={{ padding: 20 }}>
-          <div style={{ fontFamily: FONTS.SERIF, fontSize: 18, fontWeight: 700, color: C.greenDk, marginBottom: 4 }}>
-            Saldos disponibles por banco
+        <Card style={{ padding: 20, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <Landmark size={17} color={C.mut} />
+            <div style={{ fontFamily: FONTS.SANS, fontSize: 16, fontWeight: 800, color: C.ink, letterSpacing: -0.3 }}>
+              Saldos disponibles por banco
+            </div>
           </div>
-          <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 12 }}>
+          <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 16 }}>
             Disponible neto = saldo real − comprometido. Las cuentas en Bs muestran su equivalente en USD a cada tasa.
           </div>
-          
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <Th>Banco</Th>
-                  <Th>Moneda</Th>
-                  <Th right>Disponible neto</Th>
-                  <Th right>≈ USD (BCV)</Th>
-                  <Th right>≈ USD (Interv.)</Th>
-                  <Th right>≈ USD (Paralelo)</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {(st.bancos || []).map((b) => {
-                  const comp = comprometidoBanco(st, b); 
-                  const neto = Number(b.saldoActual) - comp; 
-                  const esUSD = b.moneda === "USD";
-                  
-                  return (
-                    <tr key={b.id}>
-                      <Td>
-                        <div style={{ fontWeight: 700 }}>{b.nombre}</div>
-                        <div style={{ fontSize: 11, color: C.mut }}>
-                          bruto {money(b.saldoActual, b.moneda)} · comprom. {money(comp, b.moneda)}
-                        </div>
-                      </Td>
-                      <Td><Badge tone="mut">{b.moneda}</Badge></Td>
-                      <Td right bold>
-                        <span style={{ color: neto >= 0 ? C.verde : C.rojo }}>{money(neto, b.moneda)}</span>
-                      </Td>
-                      <Td right>
-                        {esUSD ? <span style={{ color: C.mut }}>—</span> : money(eqUSD(neto, st.config.tasaBCV), "USD")}
-                      </Td>
-                      <Td right>
-                        {esUSD ? <span style={{ color: C.mut }}>—</span> : money(eqUSD(neto, st.config.tasaIntervencion), "USD")}
-                      </Td>
-                      <Td right>
-                        {esUSD ? <span style={{ color: C.mut }}>—</span> : money(eqUSD(neto, st.config.tasaParalelo), "USD")}
-                      </Td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+            {(st.bancos || []).map((b) => <TarjetaBanco key={b.id} b={b} st={st} />)}
           </div>
         </Card>
       )}
-    </div>
+
+      {/* 4. Variación mensual de la tasa BCV (historial externo) */}
+      <VariacionMensualBCV />
+    </Section>
   );
 }

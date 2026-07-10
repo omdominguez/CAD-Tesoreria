@@ -14,10 +14,14 @@ import { C } from "./constants/theme";
 // Histórico de tasas (para el ticker estilo bolsa de valores)
 import { conSnapshotDeHoy, hoyStr } from "./utils/finance";
 
+// Auto-actualización diaria de tasas desde fuentes externas
+import { useAutoTasas } from "./hooks/useAutoTasas";
+
 // El estado inicial por defecto si la base de datos está totalmente vacía
 const EMPTY_STATE = {
   config: { tasaBCV: "1.00", tasaIntervencion: "1.00", tasaParalelo: "1.00" },
   historialTasas: {},
+  tasasAutoActualizadas: null,
   bancos: [],
   proveedores: [],
   compromisos: [],
@@ -71,7 +75,7 @@ function InnerApp() {
     return () => {
       unsubscribe();
     };
-  }, [user, role]);
+  }, [user?.id, role]);
 
   // 2. Orquestador de Acciones Globales (Mutadores del Estado)
   // Despacha los cambios localmente y los persiste de inmediato en Supabase
@@ -81,6 +85,13 @@ function InnerApp() {
       setSt((prev) => {
         const conConfig = { ...prev, config: { ...prev.config, [key]: val } };
         const next = conSnapshotDeHoy(conConfig);
+        saveState(next, user.id).catch(console.error);
+        return next;
+      });
+    },
+    marcarTasasAutoActualizadas: (fecha) => {
+      setSt((prev) => {
+        const next = { ...prev, tasasAutoActualizadas: fecha };
         saveState(next, user.id).catch(console.error);
         return next;
       });
@@ -373,6 +384,9 @@ function InnerApp() {
       });
     }
   };
+
+  // Auto-actualización diaria de tasas (solo para roles que pueden editarlas)
+  useAutoTasas(st, act, Boolean(role === "MASTER" || role === "TESORERIA"));
 
   // 3. Renderizado condicional según el estado de la sesión
   if (authLoading || (user && role && storeLoading)) {

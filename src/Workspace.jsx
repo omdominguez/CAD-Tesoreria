@@ -80,7 +80,7 @@ export default function Workspace({ st, act }) {
             </SidebarItem>
 
             <SidebarItem act={modulo === "directorio"} onClick={() => ir("directorio")}>
-              <Users size={16} /> Directorio
+              <Users size={16} /> Cartera de Contactos
             </SidebarItem>
 
             {/* Compras: Accesible por Compras y Gerencia (Master) */}

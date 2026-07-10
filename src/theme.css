@@ -14,12 +14,12 @@
 
 :root {
   --ink: #12140F;
-  --mut: #75816F;
-  --mut2: #A2AC9B;
-  --line: #E7E9E1;
-  --line-strong: #D7DACE;
+  --mut: #626E5A;
+  --mut2: #8B9683;
+  --line: #DCDFD3;
+  --line-strong: #C7CBBB;
   --paper: #F7F8F3;
-  --body: #F3F4EE;
+  --body: #EEF0E7;
   --surface: #FFFFFF;
 
   --green: #14532B;
@@ -227,4 +227,12 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .cad-ticker-track { animation: none; }
+}
+
+.cad-spin {
+  animation: cad-spin-rotate 1s linear infinite;
+}
+@keyframes cad-spin-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

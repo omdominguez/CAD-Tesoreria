@@ -1,13 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
-
-// ============================================================================
-// CONFIGURACIÓN DEL CLIENTE
-// Reemplaza estas variables por las de tu proyecto en Supabase (o usa un .env)
-// ============================================================================
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'TU_SUPABASE_URL';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'TU_SUPABASE_ANON_KEY';
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Reutiliza el mismo cliente de Supabase que usa la autenticación (src/supabase.js),
+// en vez de crear uno nuevo aquí. Tener dos clientes por separado generaba el aviso
+// "Multiple GoTrueClient instances detected" en la consola del navegador — no rompía
+// nada, pero no es buena práctica.
+import { supabase } from "../supabase.js";
 
 // ============================================================================
 // SINCRONIZACIÓN DEL ESTADO GLOBAL (JSON)
@@ -90,7 +85,7 @@ export async function setProfileRole(id, rol) {
 
 // ============================================================================
 // ADJUNTOS (SUPABASE STORAGE)
-// Asume un bucket público llamado 'adjuntos'
+// El bucket 'adjuntos' es privado (ver migración de Storage)
 // ============================================================================
 
 export async function uploadAdjunto(file) {

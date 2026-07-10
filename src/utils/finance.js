@@ -104,6 +104,33 @@ export function comparativaEntreTasas(state) {
   ];
 }
 
+/**
+ * Agrupa una serie de tasas diarias { fecha, valor } por mes calendario
+ * y calcula la variación porcentual entre el primer y el último valor
+ * registrado de cada mes (la devaluación/"inflación en bolívares" de
+ * ese mes). Ignora meses con un solo dato (no hay variación que medir).
+ */
+export function variacionMensual(historial) {
+  const porMes = {};
+  (historial || []).forEach((r) => {
+    const mes = (r.fecha || "").slice(0, 7); // YYYY-MM
+    if (!mes) return;
+    if (!porMes[mes]) porMes[mes] = [];
+    porMes[mes].push(r);
+  });
+
+  return Object.keys(porMes)
+    .sort()
+    .map((mes) => {
+      const puntos = porMes[mes].sort((a, b) => a.fecha.localeCompare(b.fecha));
+      const apertura = puntos[0].valor;
+      const cierre = puntos[puntos.length - 1].valor;
+      const pct = apertura > 0 ? ((cierre - apertura) / apertura) * 100 : null;
+      return { mes, apertura, cierre, pct, puntos: puntos.length };
+    })
+    .filter((m) => m.puntos > 1);
+}
+
 /* ============================================================
    BÚSQUEDAS BÁSICAS
    ============================================================ */
@@ -204,6 +231,7 @@ export function ledgerProv(st, p) {
     rows.push({ 
       fecha: c.fechaPedido || c.fechaVencimiento, 
       tipo: "Compra", 
+      pedido: c.numeroPedidoOdoo || "—",
       doc: c.numeroPedidoOdoo || "—", 
       detalle: c.descripcion || "Pedido de compra", 
       moneda: c.moneda, 
@@ -218,6 +246,7 @@ export function ledgerProv(st, p) {
       rows.push({ 
         fecha: m.fecha, 
         tipo: m.tipo === "CRUCE" ? "Cruce" : "Pago", 
+        pedido: c.numeroPedidoOdoo || "—",
         doc: m.referencia || "—", 
         detalle: c.numeroPedidoOdoo ? "Pedido " + c.numeroPedidoOdoo : (c.descripcion || "Pago"), 
         moneda: m.moneda, 
@@ -248,6 +277,7 @@ export function ledgerCli(st, p) {
     rows.push({ 
       fecha: c.fechaEmision || c.fechaVencimiento, 
       tipo: "Factura", 
+      pedido: c.numeroFactura || "—",
       doc: c.numeroFactura || "—", 
       detalle: c.descripcion || "Factura de venta", 
       moneda: c.moneda, 
@@ -268,6 +298,7 @@ export function ledgerCli(st, p) {
     rows.push({ 
       fecha: m.fecha, 
       tipo: "Cobro", 
+      pedido: facRelacionada ? (facRelacionada.numeroFactura || "—") : "—",
       doc: m.descripcion || "—", 
       detalle: "Cobranza recibida", 
       moneda: m.moneda, 

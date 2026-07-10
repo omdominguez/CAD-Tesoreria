@@ -58,7 +58,7 @@ export function ContactoFicha({ st, prov: p, onClose }) {
       {/* Tarjetas de Saldo (KPIs) */}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${(provMode ? 1 : 0) + (cliMode ? 1 : 0) + 1}, 1fr)`, gap: 12, marginBottom: 18 }}>
         {provMode && (
-          <div style={{ border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px" }}>
+          <div style={{ border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", background: C.body }}>
             <div style={{ fontSize: 11.5, color: C.mut, fontWeight: 700 }}>LE DEBEMOS</div>
             <div style={{ fontFamily: FONTS.SERIF, fontSize: 22, fontWeight: 700, color: deudaProveedor > 0.005 ? C.rojo : C.verde, marginTop: 4 }}>
               {money(deudaProveedor)}
@@ -67,7 +67,7 @@ export function ContactoFicha({ st, prov: p, onClose }) {
         )}
         
         {cliMode && (
-          <div style={{ border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px" }}>
+          <div style={{ border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", background: C.body }}>
             <div style={{ fontSize: 11.5, color: C.mut, fontWeight: 700 }}>NOS DEBE</div>
             <div style={{ fontFamily: FONTS.SERIF, fontSize: 22, fontWeight: 700, color: deudaCliente > 0.005 ? C.verde : C.mut, marginTop: 4 }}>
               {money(deudaCliente)}
@@ -75,7 +75,7 @@ export function ContactoFicha({ st, prov: p, onClose }) {
           </div>
         )}
         
-        <div style={{ border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px" }}>
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", background: C.body }}>
           <div style={{ fontSize: 11.5, color: C.mut, fontWeight: 700 }}>BALANCE NETO</div>
           <div style={{ fontFamily: FONTS.SERIF, fontSize: 22, fontWeight: 700, color: C.ink, marginTop: 4 }}>
             {money(balanceNeto)}
@@ -103,7 +103,7 @@ export function ContactoFicha({ st, prov: p, onClose }) {
           <div style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, marginBottom: 8 }}>
             Estado de cuenta — Compras (lo que le pagamos)
           </div>
-          <EstadoCuenta rows={rowsProv} positivoEs="deuda" />
+          <EstadoCuenta rows={rowsProv} nombreContacto={p.razonSocial} etiquetaCargo="Compra" etiquetaAbono="Pago" />
         </div>
       )}
       
@@ -113,7 +113,7 @@ export function ContactoFicha({ st, prov: p, onClose }) {
           <div style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, marginBottom: 8 }}>
             Estado de cuenta — Ventas (lo que nos paga)
           </div>
-          <EstadoCuenta rows={rowsCli} positivoEs="cobro" />
+          <EstadoCuenta rows={rowsCli} nombreContacto={p.razonSocial} etiquetaCargo="Factura" etiquetaAbono="Cobro" />
         </div>
       )}
     </Modal>

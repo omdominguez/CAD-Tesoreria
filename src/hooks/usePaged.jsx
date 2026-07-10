@@ -1,25 +1,35 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-export function usePaged(lista = [], porPagina = 10) {
+/**
+ * Hook de paginación. Las propiedades devueltas (total, perPage,
+ * setPerPage, pages, page, setPage) coinciden a propósito con lo que
+ * espera el componente <Pagination />, para que nunca se desincronicen.
+ */
+export function usePaged(lista = [], porPaginaInicial = 10) {
   const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState(porPaginaInicial);
 
-  // Calcular el total de páginas necesarias
-  const totalPaginas = Math.ceil(lista.length / porPagina) || 1;
+  const total = lista.length;
+  const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
 
-  // Cortar el array para mostrar solo el segmento de la página actual
-  const slice = lista.slice((pagina - 1) * porPagina, pagina * porPagina);
+  // Si la lista se achica (por un filtro, o al cambiar cuántos por página)
+  // y la página actual quedó "flotando" más allá del final, la corregimos.
+  useEffect(() => {
+    if (pagina > totalPaginas) setPagina(totalPaginas);
+  }, [pagina, totalPaginas]);
 
-  // Asegurar que si la lista se achica por filtros, la página actual no quede flotando en el vacío
-  if (pagina > totalPaginas && totalPaginas > 0) {
-    setPagina(totalPaginas);
-  }
+  const paginaSegura = Math.min(pagina, totalPaginas);
+  const slice = lista.slice((paginaSegura - 1) * porPagina, paginaSegura * porPagina);
 
   return {
     slice,
-    page: pagina,
-    totalPages: totalPaginas,
+    page: paginaSegura,
+    pages: totalPaginas,
+    total,
+    perPage: porPagina,
+    setPerPage: setPorPagina,
+    setPage: setPagina,
     next: () => setPagina((p) => Math.min(p + 1, totalPaginas)),
-    prev: () => setPagina((p) => Math.max(p - 1, 1)),
-    setPage: setPagina
+    prev: () => setPagina((p) => Math.max(p - 1, 1))
   };
 }

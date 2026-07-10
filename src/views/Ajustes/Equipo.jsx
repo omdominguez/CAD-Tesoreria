@@ -100,8 +100,12 @@ export default function Equipo({ meId }) {
                     style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 12px", background: C.amarSoft, borderRadius: 10 }}
                   >
                     <div style={{ flex: 1, minWidth: 180 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: C.ink }}>{p.email}</div>
-                      <div style={{ fontSize: 11, color: C.mut }}>Se registró el {fmtD((p.created_at || "").slice(0, 10))}</div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: C.ink }}>
+                        {p.nombre ? `${p.nombre} ${p.apellido || ""}`.trim() : p.email}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.mut }}>
+                        {p.nombre ? p.email + " · " : ""}Se registró el {fmtD((p.created_at || "").slice(0, 10))}
+                      </div>
                     </div>
                     <Select
                       value={rolPendiente[p.id] || "COMPRAS"}
@@ -139,8 +143,9 @@ export default function Equipo({ meId }) {
                   {activos.map((p) => (
                     <tr key={p.id}>
                       <Td bold>
-                        {p.email}
+                        {p.nombre ? `${p.nombre} ${p.apellido || ""}`.trim() : p.email}
                         {p.id === meId ? " (tú)" : ""}
+                        {p.nombre && <div style={{ fontSize: 11, color: C.mut, fontWeight: 400 }}>{p.email}</div>}
                       </Td>
                       <Td>{fmtD((p.created_at || "").slice(0, 10))}</Td>
                       <Td>

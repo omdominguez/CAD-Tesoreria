@@ -7,7 +7,8 @@ import {
   Settings, 
   LogOut, 
   Menu, 
-  X 
+  X,
+  KeyRound
 } from "lucide-react";
 
 // Contexto de Autenticación
@@ -22,6 +23,7 @@ import { Btn } from "./components/ui/Buttons";
 import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { TickerTasas } from "./components/shared/TickerTasas";
 import { PanelNotificaciones } from "./components/shared/PanelNotificaciones";
+import { ModalCambiarPassword } from "./components/ModalCambiarPassword.jsx";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { LOGO_MARK } from "./logo.jsx";
 
@@ -37,6 +39,7 @@ export default function Workspace({ st, act }) {
   const isMobile = useIsMobile();
   const [modulo, setModulo] = useState("tablero");
   const [sidebarOpen, setSidebarOpen] = useState(() => !isMobile);
+  const [modalPassword, setModalPassword] = useState(false);
 
   // En móvil el sidebar arranca cerrado (es un panel superpuesto);
   // en escritorio arranca abierto (empuja el contenido).
@@ -113,11 +116,16 @@ export default function Workspace({ st, act }) {
             </div>
             <ThemeToggle compact />
           </div>
+          <SidebarItem onClick={() => setModalPassword(true)}>
+            <KeyRound size={16} /> Mi Cuenta
+          </SidebarItem>
           <SidebarItem style={{ color: C.rojo }} onClick={signOut}>
             <LogOut size={16} /> Cerrar Sesión
           </SidebarItem>
         </div>
       </Sidebar>
+
+      {modalPassword && <ModalCambiarPassword onClose={() => setModalPassword(false)} />}
 
       {/* 2. CONTENEDOR PRINCIPAL DE CONTENIDO */}
       <MainContent sidebarOpen={sidebarOpen}>

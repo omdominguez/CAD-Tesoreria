@@ -7,6 +7,7 @@ import { loadState, saveState, subscribeState } from "./services/store";
 // Componentes Contenedores
 import Login from "./Login";
 import Workspace from "./Workspace";
+import PantallaRecuperacion from "./PantallaRecuperacion";
 
 // Constantes de Diseño Base
 import { C } from "./constants/theme";
@@ -35,7 +36,7 @@ const EMPTY_STATE = {
    INNER APP: Maneja la lógica operativa una vez resuelto el Auth
    ============================================================ */
 function InnerApp() {
-  const { user, profile, role, activo, loading: authLoading, signOut } = useAuth();
+  const { user, profile, role, activo, loading: authLoading, signOut, modoRecuperacion } = useAuth();
   const [st, setSt] = useState(null);
   const [storeLoading, setStoreLoading] = useState(true);
 
@@ -389,6 +390,13 @@ function InnerApp() {
   useAutoTasas(st, act, Boolean(role === "MASTER" || role === "TESORERIA"));
 
   // 3. Renderizado condicional según el estado de la sesión
+
+  // Prioridad máxima: si llegó desde el link de "olvidé mi contraseña",
+  // mostramos esa pantalla sin importar en qué otro estado esté la cuenta.
+  if (modoRecuperacion) {
+    return <PantallaRecuperacion />;
+  }
+
   if (authLoading || (user && !profile) || (user && role && storeLoading)) {
     return (
       <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: C.paper, fontFamily: "sans-serif", color: C.mut, fontSize: 14 }}>

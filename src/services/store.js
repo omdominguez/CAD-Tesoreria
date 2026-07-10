@@ -66,7 +66,7 @@ export function subscribeState(callback) {
 export async function listProfiles() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, created_at, rol, activo')
+    .select('id, email, created_at, rol, activo, nombre, apellido')
     .order('created_at', { ascending: true });
 
   if (error) throw error;

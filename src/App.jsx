@@ -124,7 +124,7 @@ function InnerApp() {
     // === CONTACTOS (PROVEEDORES / CLIENTES) ===
     addProv: (p) => {
       setSt((prev) => {
-        const next = { ...prev, proveedores: [...(prev.proveedores || []), { ...p, id: crypto.randomUUID() }] };
+        const next = { ...prev, proveedores: [...(prev.proveedores || []), { ...p, id: p.id || crypto.randomUUID() }] };
         saveState(next, user.id).catch(console.error);
         return next;
       });

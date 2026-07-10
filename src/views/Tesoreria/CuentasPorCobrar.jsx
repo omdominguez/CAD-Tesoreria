@@ -20,6 +20,7 @@ import { Btn, Segmented } from "../../components/ui/Buttons";
 import { Th, Td, Pagination } from "../../components/ui/Table";
 import { Field, Input, Select } from "../../components/ui/Forms";
 import { Badge } from "../../components/ui/Data";
+import { AdjuntarPdfOdoo } from "../../components/shared/AdjuntarPdfOdoo";
 
 export default function CuentasPorCobrar({ st, act, rol }) {
   // modalOpen: controla el despliegue del modal aislado
@@ -47,7 +48,7 @@ export default function CuentasPorCobrar({ st, act, rol }) {
       desc="Registra facturas emitidas a clientes. Se cobran en la pestaña de Cobranzas." 
       action={
         puedeCrear && (
-          <Btn onClick={() => setModalOpen(true)} disabled={clientes.length === 0}>
+          <Btn onClick={() => setModalOpen(true)}>
             <Plus size={15} /> Nueva factura
           </Btn>
         )
@@ -70,7 +71,7 @@ export default function CuentasPorCobrar({ st, act, rol }) {
           title="Sin facturas" 
           msg="Registra facturas para controlar la deuda de clientes." 
           action={
-            puedeCrear && clientes.length > 0 && (
+            puedeCrear && (
               <Btn onClick={() => setModalOpen(true)}>
                 <Plus size={15} /> Nueva factura
               </Btn>
@@ -95,7 +96,6 @@ export default function CuentasPorCobrar({ st, act, rol }) {
               </thead>
               <tbody>
                 {pg.slice.map((c) => {
-                  // Si ya tiene cobros parciales o totales, protegemos el botón de eliminar
                   const isProtected = cobradoDeCxC(st, c.id) > 0;
                   const estado = estadoCxC(st, c);
                   const toneBadge = estado === "COBRADO" ? "verde" : estado === "PARCIAL" ? "amar" : "gold";
@@ -146,6 +146,7 @@ export default function CuentasPorCobrar({ st, act, rol }) {
       {modalOpen && (
         <FacturaModal 
           clientes={clientes}
+          act={act}
           onClose={() => setModalOpen(false)}
           onSave={(data) => {
             act.addCxC(data);
@@ -162,7 +163,10 @@ export default function CuentasPorCobrar({ st, act, rol }) {
    COMPONENTE AISLADO: FORMULARIO DE FACTURA (CxC)
    Esto aísla por completo la entrada de texto evitando lag en la UI
    ============================================================ */
-function FacturaModal({ clientes, onClose, onSave }) {
+function FacturaModal({ clientes, act, onClose, onSave }) {
+  const [clientesLocal, setClientesLocal] = useState(clientes);
+  const [sugerenciaNueva, setSugerenciaNueva] = useState(null);
+
   const [f, setF] = useState({ 
     clienteId: clientes[0]?.id || "", 
     numeroFactura: "", 
@@ -173,6 +177,33 @@ function FacturaModal({ clientes, onClose, onSave }) {
     fechaVencimiento: new Date().toISOString().slice(0, 10) 
   });
 
+  const onDatosDetectados = (datos, contacto) => {
+    setF((prev) => ({
+      ...prev,
+      numeroFactura: datos.numeroDocumento || prev.numeroFactura,
+      montoOriginal: datos.monto != null ? String(datos.monto) : prev.montoOriginal,
+      moneda: datos.moneda || prev.moneda,
+      descripcion: datos.descripcionSugerida || prev.descripcion,
+      fechaEmision: datos.fecha || prev.fechaEmision,
+      clienteId: contacto ? contacto.id : prev.clienteId
+    }));
+
+    if (!contacto && datos.rif) {
+      setSugerenciaNueva({ nombre: datos.nombreContraparte || "", rif: datos.rif || "" });
+    } else {
+      setSugerenciaNueva(null);
+    }
+  };
+
+  const crearClienteSugerido = () => {
+    if (!sugerenciaNueva?.nombre || !act) return;
+    const id = crypto.randomUUID();
+    act.addProv({ id, rif: sugerenciaNueva.rif, razonSocial: sugerenciaNueva.nombre, esProveedor: false, esCliente: true, bancos: [] });
+    setClientesLocal((prev) => [...prev, { id, rif: sugerenciaNueva.rif, razonSocial: sugerenciaNueva.nombre, esCliente: true }]);
+    setF((prev) => ({ ...prev, clienteId: id }));
+    setSugerenciaNueva(null);
+  };
+
   const guardar = () => {
     if (!f.clienteId || !f.montoOriginal) return;
     onSave({ ...f, montoOriginal: Number(f.montoOriginal) });
@@ -180,9 +211,28 @@ function FacturaModal({ clientes, onClose, onSave }) {
 
   return (
     <Modal title="Registrar Factura (CxC)" wide onClose={onClose}>
+      <AdjuntarPdfOdoo
+        contactos={clientesLocal}
+        onDatos={onDatosDetectados}
+        label="Adjuntar PDF de la factura de Odoo (autocompletar)"
+      />
+
+      {sugerenciaNueva && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", background: C.amarSoft, padding: "10px 12px", borderRadius: 10, marginBottom: 16 }}>
+          <div style={{ fontSize: 12.5, color: C.ink }}>
+            Cliente no encontrado: <b>{sugerenciaNueva.nombre || "sin nombre detectado"}</b>
+            {sugerenciaNueva.rif && <> (RIF {sugerenciaNueva.rif})</>}
+          </div>
+          <Btn small variant="soft" onClick={crearClienteSugerido} disabled={!sugerenciaNueva.nombre}>
+            <Plus size={13} /> Crear y seleccionar
+          </Btn>
+        </div>
+      )}
+
       <Field label="Cliente">
         <Select value={f.clienteId} onChange={(e) => setF({ ...f, clienteId: e.target.value })}>
-          {clientes.map((p) => (
+          {clientesLocal.length === 0 && <option value="">— Sin clientes registrados —</option>}
+          {clientesLocal.map((p) => (
             <option key={p.id} value={p.id}>{p.razonSocial}</option>
           ))}
         </Select>
@@ -236,7 +286,7 @@ function FacturaModal({ clientes, onClose, onSave }) {
       
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
         <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
-        <Btn onClick={guardar}>Registrar factura</Btn>
+        <Btn onClick={guardar} disabled={!f.clienteId || !f.montoOriginal}>Registrar factura</Btn>
       </div>
     </Modal>
   );

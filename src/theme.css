@@ -236,3 +236,13 @@ body {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Celdas del calendario de pagos: hover suave + transiciÃ³n al cambiar de mes */
+.cad-cal-day {
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.cad-cal-day:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 2px 8px rgba(18,20,15,0.08);
+  transform: translateY(-1px);
+}

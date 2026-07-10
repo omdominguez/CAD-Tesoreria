@@ -13,12 +13,15 @@ import {
   pendienteCxC 
 } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
+import { uploadAdjunto } from "../../services/store";
 
 // Componentes UI
 import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
 import { Th, Td, Pagination } from "../../components/ui/Table";
 import { Field, Input, Select } from "../../components/ui/Forms";
+import { AdjuntarComprobante } from "../../components/shared/AdjuntarComprobante";
+import { AdjuntoChip } from "../../components/shared/Adjuntos";
 
 export default function Cobranzas({ st, act }) {
   const [modal, setModal] = useState(false);
@@ -85,6 +88,11 @@ export default function Cobranzas({ st, act }) {
                           )}
                         </div>
                         <div style={{ fontSize: 11.5, color: C.mut }}>{c.descripcion || "—"}</div>
+                        {(c.adjuntos || []).length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 5 }}>
+                            {c.adjuntos.map((a, i) => <AdjuntoChip key={i} a={a} />)}
+                          </div>
+                        )}
                       </Td>
                       <Td>{bancoNom(st, c.bancoDestinoId)}</Td>
                       <Td right bold>
@@ -139,14 +147,37 @@ function CobranzaModal({ st, clientes, onClose, onSave }) {
     monto: "", 
     moneda: "USD", 
     bancoDestinoId: "", 
-    fecha: new Date().toISOString().slice(0, 10) 
+    fecha: new Date().toISOString().slice(0, 10),
+    adjuntos: []
   });
+  const [subiendoComprobante, setSubiendoComprobante] = useState(false);
 
   const bancosFiltrados = (st.bancos || []).filter((b) => b.moneda === f.moneda);
   
   const cxcPendientes = f.clienteId 
     ? (st.cuentasCobrar || []).filter((c) => c.clienteId === f.clienteId && c.moneda === f.moneda && activoCxC(st, c)) 
     : [];
+
+  // Se llama al terminar de leer el comprobante: pre-llena los campos Y
+  // guarda el archivo mismo como adjunto de la cobranza.
+  const onDatosDetectados = async (datos, archivo) => {
+    setF((prev) => ({
+      ...prev,
+      monto: datos.monto != null ? String(datos.monto) : prev.monto,
+      moneda: datos.moneda || prev.moneda,
+      fecha: datos.fecha || prev.fecha,
+      descripcion: datos.referencia ? `Ref. ${datos.referencia}` : prev.descripcion
+    }));
+
+    setSubiendoComprobante(true);
+    try {
+      const subido = await uploadAdjunto(archivo);
+      setF((prev) => ({ ...prev, adjuntos: [...prev.adjuntos, subido] }));
+    } catch (e) {
+      console.warn("No se pudo guardar el comprobante como adjunto:", e);
+    }
+    setSubiendoComprobante(false);
+  };
 
   const guardar = () => {
     if (!f.clienteId || !f.monto || !f.bancoDestinoId) return;
@@ -155,6 +186,19 @@ function CobranzaModal({ st, clientes, onClose, onSave }) {
 
   return (
     <Modal title="Registrar Cobranza" onClose={onClose}>
+      <AdjuntarComprobante onDatos={onDatosDetectados} />
+
+      {subiendoComprobante && (
+        <div style={{ fontSize: 11.5, color: C.mut, marginTop: -8, marginBottom: 12 }}>Guardando comprobante…</div>
+      )}
+      {f.adjuntos.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: -8, marginBottom: 14 }}>
+          {f.adjuntos.map((a, i) => (
+            <AdjuntoChip key={i} a={a} onDelete={() => setF((prev) => ({ ...prev, adjuntos: prev.adjuntos.filter((_, j) => j !== i) }))} />
+          ))}
+        </div>
+      )}
+
       <Field label="Cliente">
         <Select 
           value={f.clienteId} 

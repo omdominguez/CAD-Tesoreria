@@ -1,5 +1,5 @@
 import React, { useState, Fragment } from "react";
-import { FileText, CalendarClock, Plus, Paperclip, Trash2 } from "lucide-react";
+import { FileText, CalendarClock, CalendarDays, Plus, Paperclip, Trash2 } from "lucide-react";
 
 // Tema y Finanzas
 import { C } from "../../constants/theme";
@@ -24,6 +24,8 @@ import { Badge } from "../../components/ui/Data";
 // Componentes Compartidos y Subvistas
 import { AdjuntoChip, AdjuntosInput } from "../../components/shared/Adjuntos";
 import AgendaPagos from "./AgendaPagos";
+import CalendarioPagos from "./CalendarioPagos";
+import KpiCompras from "./KpiCompras";
 import FormCompromiso from "./FormCompromiso";
 
 export default function Compromisos({ st, act, rol }) {
@@ -57,13 +59,16 @@ export default function Compromisos({ st, act, rol }) {
       title="Compras — Cuentas por Pagar" 
       desc="Registra los pedidos y adjunta la orden de compra. La asignación de banco y el pago los realiza Tesorería; aquí verás el comprobante para compartirlo con el proveedor."
     >
+      <KpiCompras st={st} />
+
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
         <Segmented 
           value={vista} 
           onChange={setVista} 
           options={[
             { id: "lista", label: "Lista de pedidos", icon: FileText }, 
-            { id: "agenda", label: "Agenda de pagos", icon: CalendarClock }
+            { id: "agenda", label: "Agenda de pagos", icon: CalendarClock },
+            { id: "calendario", label: "Calendario", icon: CalendarDays }
           ]} 
         />
         {puedeCrear && vista === "lista" && (
@@ -197,10 +202,14 @@ export default function Compromisos({ st, act, rol }) {
       {/* Vista de Agenda Alternativa */}
       {vista === "agenda" && <AgendaPagos st={st} />}
 
+      {/* Vista de Calendario */}
+      {vista === "calendario" && <CalendarioPagos st={st} />}
+
       {/* Modales */}
       {modal === "new" && (
         <FormCompromiso 
           proveedores={proveedores}
+          act={act}
           onSave={(listaDeCuotas) => {
             act.addCompromisoMulti(listaDeCuotas);
             setModal(null);

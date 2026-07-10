@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Plus } from "lucide-react";
 
 // Tema y utilidades
 import { C, CLASIF } from "../../constants/theme";
@@ -9,9 +10,14 @@ import { Modal } from "../../components/ui/Layout";
 import { Field, Input, Select } from "../../components/ui/Forms";
 import { Btn } from "../../components/ui/Buttons";
 import { AdjuntosInput } from "../../components/shared/Adjuntos";
+import { AdjuntarPdfOdoo } from "../../components/shared/AdjuntarPdfOdoo";
 
-export default function FormCompromiso({ proveedores, onSave, onClose }) {
-  // Estado local y aislado del formulario
+export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
+  // Copia local de proveedores para poder reflejar de inmediato uno recién creado
+  // (mientras el resto de la app se sincroniza con Supabase de fondo).
+  const [proveedoresLocal, setProveedoresLocal] = useState(proveedores);
+  const [sugerenciaNueva, setSugerenciaNueva] = useState(null); // { nombre, rif } detectado sin match
+
   const [f, setF] = useState({ 
     proveedorId: proveedores[0]?.id || "", 
     numeroPedidoOdoo: "", 
@@ -30,6 +36,34 @@ export default function FormCompromiso({ proveedores, onSave, onClose }) {
     adjuntos: [] 
   });
 
+  // Se llama cuando el PDF adjunto termina de leerse y analizarse
+  const onDatosDetectados = (datos, contacto) => {
+    setF((prev) => ({
+      ...prev,
+      numeroPedidoOdoo: datos.numeroDocumento || prev.numeroPedidoOdoo,
+      montoOriginal: datos.monto != null ? String(datos.monto) : prev.montoOriginal,
+      moneda: datos.moneda || prev.moneda,
+      descripcion: datos.descripcionSugerida || prev.descripcion,
+      fechaPedido: datos.fecha || prev.fechaPedido,
+      proveedorId: contacto ? contacto.id : prev.proveedorId
+    }));
+
+    if (!contacto && datos.rif) {
+      setSugerenciaNueva({ nombre: datos.nombreContraparte || "", rif: datos.rif || "" });
+    } else {
+      setSugerenciaNueva(null);
+    }
+  };
+
+  const crearProveedorSugerido = () => {
+    if (!sugerenciaNueva?.nombre || !act) return;
+    const id = crypto.randomUUID();
+    act.addProv({ id, rif: sugerenciaNueva.rif, razonSocial: sugerenciaNueva.nombre, esProveedor: true, esCliente: false, bancos: [] });
+    setProveedoresLocal((prev) => [...prev, { id, rif: sugerenciaNueva.rif, razonSocial: sugerenciaNueva.nombre, esProveedor: true }]);
+    setF((prev) => ({ ...prev, proveedorId: id }));
+    setSugerenciaNueva(null);
+  };
+
   const guardarNuevo = () => {
     if (!f.proveedorId || !f.montoOriginal) return;
     
@@ -41,7 +75,6 @@ export default function FormCompromiso({ proveedores, onSave, onClose }) {
       const montoRestante = Number(f.montoOriginal) - montoInicial;
       const montoPorCuota = montoRestante / numCuotas;
       
-      // Si hay pago inicial, lo creamos como un compromiso aparte (y posiblemente ya pagado)
       if (montoInicial > 0) {
         listaCuotas.push({ 
           data: { 
@@ -60,7 +93,6 @@ export default function FormCompromiso({ proveedores, onSave, onClose }) {
         });
       }
       
-      // Proyección de las cuotas restantes
       let d = new Date(f.fechaVencimiento + "T00:00:00");
       for (let i = 1; i <= numCuotas; i++) {
         listaCuotas.push({ 
@@ -73,7 +105,6 @@ export default function FormCompromiso({ proveedores, onSave, onClose }) {
           anticipo: null 
         });
         
-        // Incrementar la fecha según la frecuencia elegida
         if (f.frecuencia === "MENSUAL") d.setMonth(d.getMonth() + 1); 
         else if (f.frecuencia === "QUINCENAL") d.setDate(d.getDate() + 15); 
         else if (f.frecuencia === "SEMANAL") d.setDate(d.getDate() + 7);
@@ -81,16 +112,33 @@ export default function FormCompromiso({ proveedores, onSave, onClose }) {
       
       onSave(listaCuotas);
     } else {
-      // Compra simple (Un solo pago)
       onSave([{ data: { ...f, montoOriginal: Number(f.montoOriginal) }, anticipo: null }]);
     }
   };
 
   return (
     <Modal title="Registrar Compra / Financiamiento" wide onClose={onClose}>
+      <AdjuntarPdfOdoo
+        contactos={proveedoresLocal}
+        onDatos={onDatosDetectados}
+        label="Adjuntar PDF del pedido de Odoo (autocompletar)"
+      />
+
+      {sugerenciaNueva && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", background: C.amarSoft, padding: "10px 12px", borderRadius: 10, marginBottom: 16 }}>
+          <div style={{ fontSize: 12.5, color: C.ink }}>
+            Proveedor no encontrado: <b>{sugerenciaNueva.nombre || "sin nombre detectado"}</b>
+            {sugerenciaNueva.rif && <> (RIF {sugerenciaNueva.rif})</>}
+          </div>
+          <Btn small variant="soft" onClick={crearProveedorSugerido} disabled={!sugerenciaNueva.nombre}>
+            <Plus size={13} /> Crear y seleccionar
+          </Btn>
+        </div>
+      )}
+
       <Field label="Proveedor">
         <Select value={f.proveedorId} onChange={(e) => setF({ ...f, proveedorId: e.target.value })}>
-          {proveedores.map((p) => (
+          {proveedoresLocal.map((p) => (
             <option key={p.id} value={p.id}>{p.razonSocial}</option>
           ))}
         </Select>

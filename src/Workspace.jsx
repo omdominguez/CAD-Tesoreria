@@ -22,6 +22,7 @@ import { Btn } from "./components/ui/Buttons";
 import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { TickerTasas } from "./components/shared/TickerTasas";
 import { useIsMobile } from "./hooks/useIsMobile";
+import { LOGO_MARK } from "./logo.jsx";
 
 // Vistas Principales (Los módulos que creamos)
 import Tablero from "./views/Tablero/Tablero";
@@ -60,12 +61,15 @@ export default function Workspace({ st, act }) {
       <Sidebar open={sidebarOpen} mobile={isMobile}>
         <div>
           {/* Logo o Cabecera del Sistema */}
-          <div style={{ padding: "20px 16px", borderBottom: `1px solid ${C.line}`, marginBottom: 16 }}>
-            <div style={{ fontFamily: FONTS.SANS, fontSize: 17, fontWeight: 800, color: C.ink, letterSpacing: -0.3 }}>
-              EL MAIZALITO
-            </div>
-            <div style={{ fontSize: 10.5, color: C.mut, fontWeight: 700, marginTop: 2, letterSpacing: 0.6, textTransform: "uppercase" }}>
-              SISTEMA FINANCIERO
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "18px 16px", borderBottom: `1px solid ${C.line}`, marginBottom: 16 }}>
+            <img src={LOGO_MARK} alt="" style={{ height: 32, width: "auto", display: "block", flexShrink: 0 }} />
+            <div>
+              <div style={{ fontFamily: FONTS.SANS, fontSize: 16, fontWeight: 800, color: C.ink, letterSpacing: -0.3, lineHeight: 1.15 }}>
+                EL MAIZALITO
+              </div>
+              <div style={{ fontSize: 10, color: C.mut, fontWeight: 700, marginTop: 1, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                SISTEMA FINANCIERO
+              </div>
             </div>
           </div>
 

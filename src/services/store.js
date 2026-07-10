@@ -66,7 +66,7 @@ export function subscribeState(callback) {
 export async function listProfiles() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, created_at, rol')
+    .select('id, email, created_at, rol, activo')
     .order('created_at', { ascending: true });
 
   if (error) throw error;
@@ -80,6 +80,43 @@ export async function setProfileRole(id, rol) {
     .eq('id', id);
 
   if (error) throw error;
+  return true;
+}
+
+/** Autoriza a un usuario recién registrado y le asigna su rol, en un solo paso. */
+export async function aprobarUsuario(id, rol) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ rol, activo: true })
+    .eq('id', id);
+
+  if (error) throw error;
+  return true;
+}
+
+/** Revoca el acceso de un usuario (por ejemplo, si alguien deja el equipo). */
+export async function revocarUsuario(id) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ activo: false })
+    .eq('id', id);
+
+  if (error) throw error;
+  return true;
+}
+
+/**
+ * Elimina POR COMPLETO la cuenta de un usuario (no solo le quita el
+ * acceso): su correo queda libre para poder registrarse de nuevo más
+ * adelante. Solo funciona si quien llama es Master — lo valida la
+ * función del lado del servidor, no aquí.
+ */
+export async function eliminarUsuario(id) {
+  const { data, error } = await supabase.functions.invoke('eliminar-usuario', {
+    body: { userId: id }
+  });
+  if (error) throw error;
+  if (data && data.ok === false) throw new Error(data.error || 'No se pudo eliminar la cuenta.');
   return true;
 }
 

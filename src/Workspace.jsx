@@ -21,6 +21,7 @@ import { AppShell, Sidebar, SidebarBackdrop, TopBar, MainContent, SidebarItem } 
 import { Btn } from "./components/ui/Buttons";
 import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { TickerTasas } from "./components/shared/TickerTasas";
+import { PanelNotificaciones } from "./components/shared/PanelNotificaciones";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { LOGO_MARK } from "./logo.jsx";
 
@@ -130,6 +131,7 @@ export default function Workspace({ st, act }) {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, textAlign: "right", flexShrink: 0 }}>
+            <PanelNotificaciones st={st} act={act} rol={role} />
             {!isMobile && (
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{user?.email}</div>

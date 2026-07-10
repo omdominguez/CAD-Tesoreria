@@ -39,6 +39,7 @@ export function AuthProvider({ children }) {
     user: session?.user || null,
     profile,
     role: profile?.rol || "COMPRAS",
+    activo: profile?.activo ?? false,
     loading,
     signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
     signUp: (email, password) => supabase.auth.signUp({ email, password }),

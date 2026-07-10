@@ -35,7 +35,7 @@ const EMPTY_STATE = {
    INNER APP: Maneja la lógica operativa una vez resuelto el Auth
    ============================================================ */
 function InnerApp() {
-  const { user, role, loading: authLoading } = useAuth();
+  const { user, profile, role, activo, loading: authLoading, signOut } = useAuth();
   const [st, setSt] = useState(null);
   const [storeLoading, setStoreLoading] = useState(true);
 
@@ -389,10 +389,36 @@ function InnerApp() {
   useAutoTasas(st, act, Boolean(role === "MASTER" || role === "TESORERIA"));
 
   // 3. Renderizado condicional según el estado de la sesión
-  if (authLoading || (user && role && storeLoading)) {
+  if (authLoading || (user && !profile) || (user && role && storeLoading)) {
     return (
       <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: C.paper, fontFamily: "sans-serif", color: C.mut, fontSize: 14 }}>
         Sincronizando con El Maizalito Real-Time...
+      </div>
+    );
+  }
+
+  // Cuenta creada pero todavía no autorizada por un Master
+  if (user && profile && !activo) {
+    return (
+      <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: C.paper, fontFamily: "sans-serif", padding: 20 }}>
+        <div style={{ maxWidth: 420, textAlign: "center", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 16, padding: 32 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 12, background: C.amarSoft, color: C.amar, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 22 }}>
+            ⏳
+          </div>
+          <div style={{ fontFamily: "serif", fontSize: 19, fontWeight: 700, color: C.ink, marginBottom: 8 }}>
+            Tu cuenta está pendiente de aprobación
+          </div>
+          <div style={{ fontSize: 13.5, color: C.mut, lineHeight: 1.5, marginBottom: 20 }}>
+            Ya te registraste con <b>{user.email}</b>. Un administrador (Master) necesita autorizar tu acceso
+            y asignarte un rol antes de que puedas entrar. Te avisaremos apenas esté listo.
+          </div>
+          <button
+            onClick={signOut}
+            style={{ background: C.ink, color: "#fff", border: "none", borderRadius: 9, padding: "10px 18px", fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}
+          >
+            Cerrar sesión
+          </button>
+        </div>
       </div>
     );
   }

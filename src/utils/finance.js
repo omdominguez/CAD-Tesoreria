@@ -153,9 +153,14 @@ export const bancosProv = (p) => Array.isArray(p?.bancos) ? p.bancos : (p?.banco
 /** Busca una cuenta bancaria específica de un proveedor por su id. */
 export const cuentaProvPorId = (p, cuentaId) => bancosProv(p).find((b) => b.id === cuentaId) || null;
 
-/** Texto corto para mostrar una cuenta bancaria de proveedor (banco + últimos dígitos, o SWIFT si es internacional). */
+/** Texto corto para mostrar una cuenta bancaria de proveedor (banco + últimos dígitos, SWIFT si es internacional, o wallet si es cripto). */
 export function resumenCuenta(cta) {
   if (!cta) return null;
+  if (cta.tipo === "CRIPTO") {
+    const wallet = cta.walletAddress || "";
+    const corta = wallet.length > 10 ? wallet.slice(0, 6) + "…" + wallet.slice(-4) : wallet;
+    return [cta.moneda || "Cripto", cta.red, corta].filter(Boolean).join(" — ");
+  }
   const partes = [cta.banco || "Banco sin nombre"];
   if (cta.tipo === "INTERNACIONAL") {
     if (cta.swift) partes.push(`SWIFT ${cta.swift}`);

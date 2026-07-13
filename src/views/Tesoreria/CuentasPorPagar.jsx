@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CreditCard, Building2, Banknote, Lock, Globe2, MapPin } from "lucide-react";
+import { CreditCard, Building2, Banknote, Lock, Globe2, MapPin, Coins } from "lucide-react";
 
 // Tema y utilidades
 import { C, TIPOS_MOV } from "../../constants/theme";
@@ -137,7 +137,7 @@ export default function CuentasPorPagar({ st, act, rol }) {
                       <Td>
                         {cuentaDestino ? (
                           <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
-                            {cuentaDestino.tipo === "INTERNACIONAL" ? <Globe2 size={12} color={C.azul} /> : <MapPin size={12} color={C.mut} />}
+                            {cuentaDestino.tipo === "CRIPTO" ? <Coins size={12} color={C.gold} /> : cuentaDestino.tipo === "INTERNACIONAL" ? <Globe2 size={12} color={C.azul} /> : <MapPin size={12} color={C.mut} />}
                             {resumenCuenta(cuentaDestino)}
                           </div>
                         ) : (
@@ -226,8 +226,10 @@ function AsignarBancoModal({ st, initialData, onClose, onSave }) {
           <option value="">Sin asignar</option>
           {cuentasProveedor.map((cta) => (
             <option key={cta.id} value={cta.id}>
-              {cta.tipo === "INTERNACIONAL" ? "🌐 " : "🏠 "}
-              {cta.banco} — {cta.tipo === "INTERNACIONAL" ? `SWIFT ${cta.swift || "—"}` : cta.cuenta} ({cta.moneda})
+              {cta.tipo === "CRIPTO" ? "🪙 " : cta.tipo === "INTERNACIONAL" ? "🌐 " : "🏠 "}
+              {cta.tipo === "CRIPTO"
+                ? `${cta.moneda} (${cta.red}) — ${(cta.walletAddress || "").slice(0, 8)}…`
+                : `${cta.banco} — ${cta.tipo === "INTERNACIONAL" ? `SWIFT ${cta.swift || "—"}` : cta.cuenta} (${cta.moneda})`}
             </option>
           ))}
         </Select>
@@ -278,14 +280,23 @@ function PagarProveedorModal({ st, initialData, onClose, onSave }) {
 
       {f.cuentaDestino ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.body, padding: "9px 12px", borderRadius: 10, fontSize: 12.5, marginBottom: 14, border: `1px solid ${C.line}` }}>
-          {f.cuentaDestino.tipo === "INTERNACIONAL" ? <Globe2 size={15} color={C.azul} /> : <MapPin size={15} color={C.mut} />}
-          <div>
-            <div style={{ fontWeight: 700, color: C.ink }}>{f.cuentaDestino.banco}</div>
-            <div style={{ color: C.mut }}>
-              {f.cuentaDestino.tipo === "INTERNACIONAL"
+          {f.cuentaDestino.tipo === "CRIPTO" ? <Coins size={15} color={C.gold} /> : f.cuentaDestino.tipo === "INTERNACIONAL" ? <Globe2 size={15} color={C.azul} /> : <MapPin size={15} color={C.mut} />}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: C.ink }}>
+              {f.cuentaDestino.tipo === "CRIPTO" ? `${f.cuentaDestino.moneda} · ${f.cuentaDestino.red}` : f.cuentaDestino.banco}
+            </div>
+            <div style={{ color: C.mut, wordBreak: "break-all" }}>
+              {f.cuentaDestino.tipo === "CRIPTO"
+                ? f.cuentaDestino.walletAddress
+                : f.cuentaDestino.tipo === "INTERNACIONAL"
                 ? `SWIFT ${f.cuentaDestino.swift || "—"}${f.cuentaDestino.routing ? " · Routing " + f.cuentaDestino.routing : ""} · ${f.cuentaDestino.pais || ""}`
                 : `Cuenta ${f.cuentaDestino.cuenta}`}
             </div>
+            {f.cuentaDestino.tipo === "CRIPTO" && (
+              <div style={{ color: C.rojo, fontSize: 11, marginTop: 4, fontWeight: 600 }}>
+                Verifica la red ({f.cuentaDestino.red}) antes de transferir — es irreversible.
+              </div>
+            )}
           </div>
         </div>
       ) : (

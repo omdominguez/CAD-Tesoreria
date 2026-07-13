@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Trash2, Pencil, Users, X, Globe2, MapPin } from "lucide-react";
+import { Plus, Trash2, Pencil, Users, X, Globe2, MapPin, Coins } from "lucide-react";
 
 // Tema y Utilidades
 import { C } from "../../constants/theme";
@@ -12,15 +12,20 @@ import { Field, Input, Select } from "../../components/ui/Forms";
 import { Th, Td } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Data";
 
+// Redes cripto más comunes para pagos a proveedores en Venezuela
+const REDES_CRIPTO = ["TRC20 (Tron)", "ERC20 (Ethereum)", "BEP20 (BSC)", "Polygon", "Bitcoin", "Solana"];
+
 const CUENTA_VACIA = () => ({
   id: crypto.randomUUID(),
   banco: "",
   cuenta: "",
   moneda: "USD",
-  tipo: "NACIONAL",
+  tipo: "NACIONAL", // NACIONAL | INTERNACIONAL | CRIPTO
   pais: "Venezuela",
   swift: "",
-  routing: ""
+  routing: "",
+  red: "TRC20 (Tron)",
+  walletAddress: ""
 });
 
 export default function GestorContactos({ st, act }) {
@@ -100,8 +105,9 @@ export default function GestorContactos({ st, act }) {
                         ) : (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                             {cuentas.map((c, i) => (
-                              <Badge key={i} tone={c.tipo === "INTERNACIONAL" ? "azul" : "mut"}>
-                                {c.tipo === "INTERNACIONAL" ? <Globe2 size={10} /> : <MapPin size={10} />} {c.banco || "Sin nombre"}
+                              <Badge key={i} tone={c.tipo === "CRIPTO" ? "gold" : c.tipo === "INTERNACIONAL" ? "azul" : "mut"}>
+                                {c.tipo === "CRIPTO" ? <Coins size={10} /> : c.tipo === "INTERNACIONAL" ? <Globe2 size={10} /> : <MapPin size={10} />}
+                                {" "}{c.tipo === "CRIPTO" ? (c.moneda || "Cripto") : (c.banco || "Sin nombre")}
                               </Badge>
                             ))}
                           </div>
@@ -193,7 +199,7 @@ function ContactoModal({ initialData, onClose, onSave }) {
     const dataClean = { 
       rif: f.rif, 
       razonSocial: f.razonSocial, 
-      bancos: (f.bancos || []).filter((b) => b.banco || b.cuenta), 
+      bancos: (f.bancos || []).filter((b) => b.banco || b.cuenta || b.walletAddress), 
       esProveedor: f.esProveedor, 
       esCliente: f.esCliente, 
       id: f.id 
@@ -256,7 +262,8 @@ function ContactoModal({ initialData, onClose, onSave }) {
                     onChange={(v) => setBco(i, "tipo", v)}
                     options={[
                       { id: "NACIONAL", label: "Nacional" },
-                      { id: "INTERNACIONAL", label: "Internacional" }
+                      { id: "INTERNACIONAL", label: "Internacional" },
+                      { id: "CRIPTO", label: "Cripto" }
                     ]}
                   />
                   <Btn small variant="danger" onClick={() => delBco(i)}>
@@ -264,52 +271,80 @@ function ContactoModal({ initialData, onClose, onSave }) {
                   </Btn>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginBottom: 8 }}>
-                  <Input 
-                    value={b.banco} 
-                    onChange={(e) => setBco(i, "banco", e.target.value)} 
-                    placeholder="Nombre del banco" 
-                    style={{ marginBottom: 0 }} 
-                  />
-                  <Select value={b.moneda} onChange={(e) => setBco(i, "moneda", e.target.value)} style={{ marginBottom: 0 }}>
-                    <option value="USD">USD</option>
-                    <option value="BS">Bs</option>
-                    <option value="EUR">EUR</option>
-                  </Select>
-                </div>
+                {b.tipo === "CRIPTO" ? (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                      <Select value={b.moneda} onChange={(e) => setBco(i, "moneda", e.target.value)} style={{ marginBottom: 0 }}>
+                        <option value="USDT">USDT</option>
+                        <option value="USDC">USDC</option>
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                        <option value="BNB">BNB</option>
+                      </Select>
+                      <Select value={b.red} onChange={(e) => setBco(i, "red", e.target.value)} style={{ marginBottom: 0 }}>
+                        {REDES_CRIPTO.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </Select>
+                    </div>
+                    <Input
+                      value={b.walletAddress}
+                      onChange={(e) => setBco(i, "walletAddress", e.target.value)}
+                      placeholder="Dirección de la wallet"
+                      style={{ marginBottom: 0, fontFamily: "monospace", fontSize: 12.5 }}
+                    />
+                    <div style={{ fontSize: 11, color: C.mut, marginTop: 6 }}>
+                      Verifica siempre la red antes de transferir — enviar por la red equivocada puede perder los fondos de forma irreversible.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginBottom: 8 }}>
+                      <Input 
+                        value={b.banco} 
+                        onChange={(e) => setBco(i, "banco", e.target.value)} 
+                        placeholder="Nombre del banco" 
+                        style={{ marginBottom: 0 }} 
+                      />
+                      <Select value={b.moneda} onChange={(e) => setBco(i, "moneda", e.target.value)} style={{ marginBottom: 0 }}>
+                        <option value="USD">USD</option>
+                        <option value="BS">Bs</option>
+                        <option value="EUR">EUR</option>
+                      </Select>
+                    </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: b.tipo === "INTERNACIONAL" ? "1fr 1fr" : "1fr", gap: 8, marginBottom: b.tipo === "INTERNACIONAL" ? 8 : 0 }}>
-                  <Input 
-                    value={b.cuenta} 
-                    onChange={(e) => setBco(i, "cuenta", e.target.value)} 
-                    placeholder="N° de cuenta / IBAN" 
-                    style={{ marginBottom: 0 }} 
-                  />
-                  {b.tipo === "INTERNACIONAL" && (
-                    <Input 
-                      value={b.pais} 
-                      onChange={(e) => setBco(i, "pais", e.target.value)} 
-                      placeholder="País del banco (ej. Estados Unidos)" 
-                      style={{ marginBottom: 0 }} 
-                    />
-                  )}
-                </div>
+                    <div style={{ display: "grid", gridTemplateColumns: b.tipo === "INTERNACIONAL" ? "1fr 1fr" : "1fr", gap: 8, marginBottom: b.tipo === "INTERNACIONAL" ? 8 : 0 }}>
+                      <Input 
+                        value={b.cuenta} 
+                        onChange={(e) => setBco(i, "cuenta", e.target.value)} 
+                        placeholder="N° de cuenta / IBAN" 
+                        style={{ marginBottom: 0 }} 
+                      />
+                      {b.tipo === "INTERNACIONAL" && (
+                        <Input 
+                          value={b.pais} 
+                          onChange={(e) => setBco(i, "pais", e.target.value)} 
+                          placeholder="País del banco (ej. Estados Unidos)" 
+                          style={{ marginBottom: 0 }} 
+                        />
+                      )}
+                    </div>
 
-                {b.tipo === "INTERNACIONAL" && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <Input 
-                      value={b.swift} 
-                      onChange={(e) => setBco(i, "swift", e.target.value)} 
-                      placeholder="Código SWIFT / BIC" 
-                      style={{ marginBottom: 0 }} 
-                    />
-                    <Input 
-                      value={b.routing} 
-                      onChange={(e) => setBco(i, "routing", e.target.value)} 
-                      placeholder="Routing number (ABA)" 
-                      style={{ marginBottom: 0 }} 
-                    />
-                  </div>
+                    {b.tipo === "INTERNACIONAL" && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <Input 
+                          value={b.swift} 
+                          onChange={(e) => setBco(i, "swift", e.target.value)} 
+                          placeholder="Código SWIFT / BIC" 
+                          style={{ marginBottom: 0 }} 
+                        />
+                        <Input 
+                          value={b.routing} 
+                          onChange={(e) => setBco(i, "routing", e.target.value)} 
+                          placeholder="Routing number (ABA)" 
+                          style={{ marginBottom: 0 }} 
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ))}

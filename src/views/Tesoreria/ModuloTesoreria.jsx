@@ -11,7 +11,7 @@ import CuentasPorCobrar from "./CuentasPorCobrar";
 import CuentasPorPagar from "./CuentasPorPagar";
 import LibroBancos from "./LibroBancos";
 
-export default function ModuloTesoreria({ st, act, rol }) {
+export default function ModuloTesoreria({ st, act, rol, usuario }) {
   const [sub, setSub] = useState("cxc");
 
   // Opciones de navegación con íconos semánticos para el módulo financiero
@@ -34,7 +34,7 @@ export default function ModuloTesoreria({ st, act, rol }) {
       {sub === "cxc" && <CuentasPorCobrar st={st} act={act} rol={rol} />}
       {sub === "cobranzas" && <Cobranzas st={st} act={act} rol={rol} />}
       {sub === "cxp" && <CuentasPorPagar st={st} act={act} rol={rol} />}
-      {sub === "corridas" && <Corridas st={st} act={act} rol={rol} />}
+      {sub === "corridas" && <Corridas st={st} act={act} rol={rol} usuario={usuario} />}
       {sub === "libro" && <LibroBancos st={st} />}
     </div>
   );

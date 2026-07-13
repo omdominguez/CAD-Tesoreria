@@ -7,8 +7,7 @@ import {
   Settings, 
   LogOut, 
   Menu, 
-  X,
-  KeyRound
+  X
 } from "lucide-react";
 
 // Contexto de Autenticación
@@ -23,7 +22,7 @@ import { Btn } from "./components/ui/Buttons";
 import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { TickerTasas } from "./components/shared/TickerTasas";
 import { PanelNotificaciones } from "./components/shared/PanelNotificaciones";
-import { ModalCambiarPassword } from "./components/ModalCambiarPassword.jsx";
+import { ModalMiCuenta } from "./components/ModalMiCuenta.jsx";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { LOGO_MARK } from "./logo.jsx";
 
@@ -116,16 +115,13 @@ export default function Workspace({ st, act }) {
             </div>
             <ThemeToggle compact />
           </div>
-          <SidebarItem onClick={() => setModalPassword(true)}>
-            <KeyRound size={16} /> Mi Cuenta
-          </SidebarItem>
           <SidebarItem style={{ color: C.rojo }} onClick={signOut}>
             <LogOut size={16} /> Cerrar Sesión
           </SidebarItem>
         </div>
       </Sidebar>
 
-      {modalPassword && <ModalCambiarPassword onClose={() => setModalPassword(false)} />}
+      {modalPassword && <ModalMiCuenta onClose={() => setModalPassword(false)} />}
 
       {/* 2. CONTENEDOR PRINCIPAL DE CONTENIDO */}
       <MainContent sidebarOpen={sidebarOpen}>
@@ -141,23 +137,38 @@ export default function Workspace({ st, act }) {
           <div style={{ display: "flex", alignItems: "center", gap: 12, textAlign: "right", flexShrink: 0 }}>
             <PanelNotificaciones st={st} act={act} rol={role} />
             {!isMobile && (
-              <div>
+              <button
+                onClick={() => setModalPassword(true)}
+                title="Mi Cuenta"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                  borderRadius: 10,
+                  textAlign: "right",
+                  fontFamily: FONTS.SANS
+                }}
+                className="cad-sidebar-item"
+              >
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{user?.email}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: C.mut }}>{ROL_LBL[role] || "Usuario"}</div>
-              </div>
+              </button>
             )}
             {isMobile && (
-              <div
+              <button
+                onClick={() => setModalPassword(true)}
                 title={user?.email}
                 style={{
                   width: 30, height: 30, borderRadius: 999,
                   background: C.greenSoft, color: C.greenDk,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 13, fontWeight: 800, fontFamily: FONTS.SANS,
+                  border: "none", cursor: "pointer"
                 }}
               >
                 {(user?.email || "?").charAt(0).toUpperCase()}
-              </div>
+              </button>
             )}
           </div>
         </TopBar>
@@ -170,7 +181,7 @@ export default function Workspace({ st, act }) {
             <Compromisos st={st} act={act} rol={role} />
           )}
           {modulo === "tesoreria" && (role === "TESORERIA" || role === "MASTER") && (
-            <ModuloTesoreria st={st} act={act} rol={role} />
+            <ModuloTesoreria st={st} act={act} rol={role} usuario={user?.email} />
           )}
           {modulo === "ajustes" && (
             <ModuloAjustes st={st} act={act} rol={role} meId={user?.id} />

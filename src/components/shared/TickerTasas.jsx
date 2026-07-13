@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown, Minus, ArrowLeftRight } from "lucide-react";
 import { C, FONTS } from "../../constants/theme";
 import { nf, variacionTasas, comparativaEntreTasas } from "../../utils/finance";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 const DURACION_VUELTA_MS = 13000; // cuánto dura cada "vuelta" antes de alternar
 
@@ -19,17 +20,17 @@ function FlechaVariacion({ pct }) {
 }
 
 /* Vuelta 1: cada tasa vs. el cierre del día anterior (con el valor de ayer chiquito) */
-function ItemDiario({ item }) {
+function ItemDiario({ item, isMobile }) {
   const { label, valor, anterior, pct } = item;
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "0 22px", whiteSpace: "nowrap" }}>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: isMobile ? 6 : 8, padding: isMobile ? "0 14px" : "0 22px", whiteSpace: "nowrap" }}>
       <span style={{ fontSize: 11.5, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 0.4 }}>
         {label}
       </span>
       <span style={{ fontSize: 13.5, fontWeight: 800, color: C.ink, fontVariantNumeric: "tabular-nums", fontFamily: FONTS.SANS }}>
         Bs {nf.format(valor)}
       </span>
-      {anterior !== null && (
+      {anterior !== null && !isMobile && (
         <span style={{ fontSize: 10.5, color: C.mut2, fontVariantNumeric: "tabular-nums" }}>
           ayer Bs {nf.format(anterior)}
         </span>
@@ -40,9 +41,9 @@ function ItemDiario({ item }) {
 }
 
 /* Vuelta 2: comparación de las tasas entre sí (brecha cambiaria) */
-function ItemComparativo({ item }) {
+function ItemComparativo({ item, isMobile }) {
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "0 22px", whiteSpace: "nowrap" }}>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: isMobile ? "0 14px" : "0 22px", whiteSpace: "nowrap" }}>
       <ArrowLeftRight size={12} color={C.mut} />
       <span style={{ fontSize: 11.5, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 0.3 }}>
         {item.label}
@@ -60,6 +61,7 @@ function ItemComparativo({ item }) {
  */
 export function TickerTasas({ st }) {
   const [modo, setModo] = useState("diario"); // 'diario' | 'comparativo'
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -87,8 +89,8 @@ export function TickerTasas({ st }) {
       <div key={modo} className="cad-ticker-track" style={{ display: "inline-flex" }}>
         {doble.map((item, i) =>
           modo === "diario"
-            ? <ItemDiario key={item.key + "-" + i} item={item} />
-            : <ItemComparativo key={item.key + "-" + i} item={item} />
+            ? <ItemDiario key={item.key + "-" + i} item={item} isMobile={isMobile} />
+            : <ItemComparativo key={item.key + "-" + i} item={item} isMobile={isMobile} />
         )}
       </div>
     </div>

@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 
 // Tema y utilidades
 import { C, CLASIF } from "../../constants/theme";
-import { money } from "../../utils/finance";
+import { money, FORMAS_PAGO } from "../../utils/finance";
 
 // Componentes UI
 import { Modal } from "../../components/ui/Layout";
@@ -25,6 +25,7 @@ export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
     categoria: CLASIF[0], 
     montoOriginal: "", 
     moneda: "USD", 
+    formaPago: "USD", 
     fechaPedido: new Date().toISOString().slice(0, 10), 
     fechaVencimiento: new Date().toISOString().slice(0, 10), 
     prioridad: "NORMAL", 
@@ -42,7 +43,7 @@ export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
       ...prev,
       numeroPedidoOdoo: datos.numeroDocumento || prev.numeroPedidoOdoo,
       montoOriginal: datos.monto != null ? String(datos.monto) : prev.montoOriginal,
-      moneda: datos.moneda || prev.moneda,
+      // La moneda del pedido siempre es USD — no se sobreescribe con lo detectado en el PDF
       descripcion: datos.descripcionSugerida || prev.descripcion,
       fechaPedido: datos.fecha || prev.fechaPedido,
       proveedorId: contacto ? contacto.id : prev.proveedorId
@@ -157,12 +158,16 @@ export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
             {CLASIF.map((x) => <option key={x} value={x}>{x}</option>)}
           </Select>
         </Field>
-        <Field label="Moneda">
-          <Select value={f.moneda} onChange={(e) => setF({ ...f, moneda: e.target.value })}>
-            <option value="USD">USD</option>
-            <option value="BS">Bs</option>
+        <Field label="Forma de pago (informativo)">
+          <Select value={f.formaPago} onChange={(e) => setF({ ...f, formaPago: e.target.value })}>
+            {FORMAS_PAGO.map((fp) => <option key={fp.id} value={fp.id}>{fp.label}</option>)}
           </Select>
         </Field>
+      </div>
+      <div style={{ fontSize: 11.5, color: C.mut, marginTop: -10, marginBottom: 14 }}>
+        El pedido siempre se registra en USD. Esto solo indica con qué tasa se planea pagar — al
+        momento de registrar el pago en Tesorería, el sistema calcula los Bs usando la tasa vigente
+        <b> ese día</b>, no una guardada de antemano.
       </div>
       
       <Field label="Descripción del bien o servicio">

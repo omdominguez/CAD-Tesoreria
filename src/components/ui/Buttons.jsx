@@ -1,5 +1,6 @@
 import React from "react";
 import { C, FONTS, UI } from "../../constants/theme";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 export function Btn({ children, onClick, variant = "primary", small, disabled, title }) {
   const base = { 
@@ -43,16 +44,22 @@ export function Btn({ children, onClick, variant = "primary", small, disabled, t
 }
 
 export function Segmented({ options, value, onChange }) {
+  const isMobile = useIsMobile();
   return (
-    <div style={{ 
-      display: "inline-flex", 
-      background: C.body, 
-      border: `1px solid ${C.line}`, 
-      borderRadius: UI.RADIUS_SM + 2, 
-      padding: 3, 
-      gap: 2, 
-      flexWrap: "wrap" 
-    }}>
+    <div
+      className="cad-segmented-scroll"
+      style={{
+        display: "flex",
+        background: C.body,
+        border: `1px solid ${C.line}`,
+        borderRadius: UI.RADIUS_SM + 2,
+        padding: 3,
+        gap: 2,
+        flexWrap: isMobile ? "nowrap" : "wrap",
+        overflowX: isMobile ? "auto" : "visible",
+        WebkitOverflowScrolling: "touch"
+      }}
+    >
       {options.map((o) => {
         const on = value === o.id; 
         const Ic = o.icon;
@@ -65,6 +72,7 @@ export function Segmented({ options, value, onChange }) {
               display: "inline-flex", 
               alignItems: "center", 
               gap: 7, 
+              flexShrink: 0,
               border: on ? `1px solid ${C.line}` : "1px solid transparent", 
               cursor: "pointer", 
               borderRadius: UI.RADIUS_SM, 

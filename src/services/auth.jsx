@@ -20,25 +20,28 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!isConfigured) { setLoading(false); return; }
-    let subscription;
+
+    // IMPORTANTE: nos suscribimos al evento ANTES de pedir la sesión inicial.
+    // Cuando alguien llega desde el link de "restablecer contraseña", Supabase
+    // procesa ese link y dispara el evento "PASSWORD_RECOVERY" muy temprano —
+    // si nos suscribimos después de pedir getSession(), nos lo perdemos y
+    // termina viéndose como un inicio de sesión normal (el bug que vimos).
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setModoRecuperacion(true);
+      }
+      setSession(s);
+      if (s) loadProfile(s.user.id); else setProfile(null);
+    });
+
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       if (session) await loadProfile(session.user.id);
       setLoading(false);
-      const res = supabase.auth.onAuthStateChange((event, s) => {
-        // Cuando alguien entra desde el link de "restablecer contraseña" del
-        // correo, Supabase dispara este evento especial en vez de un login
-        // normal — activamos una pantalla dedicada para poner la nueva clave.
-        if (event === "PASSWORD_RECOVERY") {
-          setModoRecuperacion(true);
-        }
-        setSession(s);
-        if (s) loadProfile(s.user.id); else setProfile(null);
-      });
-      subscription = res.data.subscription;
     })();
-    return () => { if (subscription) subscription.unsubscribe(); };
+
+    return () => { sub.subscription.unsubscribe(); };
   }, []);
 
   const value = {

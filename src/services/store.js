@@ -83,7 +83,21 @@ export async function setProfileRole(id, rol) {
   return true;
 }
 
-/** Autoriza a un usuario recién registrado y le asigna su rol, en un solo paso. */
+/**
+ * Actualiza los datos personales del usuario que hace la llamada
+ * (nombre, apellido, foto, fecha de nacimiento). Nunca puede cambiar
+ * su propio rol o estado de activación desde aquí — eso lo protege
+ * un trigger del lado de la base de datos, no solo esta función.
+ */
+export async function actualizarMiPerfil(id, campos) {
+  const { error } = await supabase
+    .from('profiles')
+    .update(campos)
+    .eq('id', id);
+
+  if (error) throw error;
+  return true;
+}
 export async function aprobarUsuario(id, rol) {
   const { error } = await supabase
     .from('profiles')

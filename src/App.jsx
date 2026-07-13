@@ -13,14 +13,14 @@ import PantallaRecuperacion from "./PantallaRecuperacion";
 import { C } from "./constants/theme";
 
 // Histórico de tasas (para el ticker estilo bolsa de valores)
-import { conSnapshotDeHoy, hoyStr } from "./utils/finance";
+import { conSnapshotDeHoy, hoyStr, tasaSegunFormaPago } from "./utils/finance";
 
 // Auto-actualización diaria de tasas desde fuentes externas
 import { useAutoTasas } from "./hooks/useAutoTasas";
 
 // El estado inicial por defecto si la base de datos está totalmente vacía
 const EMPTY_STATE = {
-  config: { tasaBCV: "1.00", tasaIntervencion: "1.00", tasaParalelo: "1.00" },
+  config: { tasaBCV: "1.00", tasaIntervencion: "1.00", tasaParalelo: "1.00", tasaBcvEuro: "1.00" },
   historialTasas: {},
   tasasAutoActualizadas: null,
   bancos: [],
@@ -237,16 +237,22 @@ function InnerApp() {
     },
 
     // === TESORERÍA: CORRIDAS DE PAGO (LOTES EN BS) ===
-    crearCorrida: (compromisoIds, rol) => {
+    crearCorrida: (compromisoIds, rol, creadoPor) => {
       setSt((prev) => {
         const corrId = crypto.randomUUID();
         const correlativo = (prev.corridas || []).length + 1;
+        const hoy = new Date().toISOString().slice(0, 10);
+        const esMaster = rol === "MASTER";
         const nuevaCorrida = {
           id: corrId,
           codigo: `CORR-${String(correlativo).padStart(4, "0")}`,
           compromisoIds,
-          estado: rol === "MASTER" ? "AUTORIZADA" : "PENDIENTE_AUTORIZACION",
-          fechaCreacion: new Date().toISOString().slice(0, 10)
+          estado: esMaster ? "AUTORIZADA" : "PENDIENTE_AUTORIZACION",
+          fechaCreacion: hoy,
+          creadoPor: creadoPor || null,
+          // Si quien arma la corrida ya es Master, esa misma acción cuenta como la autorización
+          autorizadoPor: esMaster ? creadoPor || null : null,
+          fechaAutorizacion: esMaster ? hoy : null
         };
 
         const nuevosCompromisos = (prev.compromisos || []).map((c) =>
@@ -262,28 +268,28 @@ function InnerApp() {
         return next;
       });
     },
-    aprobarCorrida: (id) => {
+    aprobarCorrida: (id, autorizadoPor) => {
       setSt((prev) => {
         const next = {
           ...prev,
-          corridas: (prev.corridas || []).map((co) => (co.id === id ? { ...co, estado: "AUTORIZADA" } : co))
+          corridas: (prev.corridas || []).map((co) => (co.id === id ? { ...co, estado: "AUTORIZADA", autorizadoPor: autorizadoPor || null, fechaAutorizacion: new Date().toISOString().slice(0, 10) } : co))
         };
         saveState(next, user.id).catch(console.error);
         return next;
       });
     },
-    rechazarCorrida: (id) => {
+    rechazarCorrida: (id, rechazadoPor) => {
       setSt((prev) => {
         const next = {
           ...prev,
-          corridas: (prev.corridas || []).map((co) => (co.id === id ? { ...co, estado: "RECHAZADA" } : co)),
+          corridas: (prev.corridas || []).map((co) => (co.id === id ? { ...co, estado: "RECHAZADA", rechazadoPor: rechazadoPor || null, fechaRechazo: new Date().toISOString().slice(0, 10) } : co)),
           compromisos: (prev.compromisos || []).map((c) => (c.corridaId === id ? { ...c, corridaId: null } : c))
         };
         saveState(next, user.id).catch(console.error);
         return next;
       });
     },
-    ejecutarCorrida: (id) => {
+    ejecutarCorrida: (id, ejecutadoPor) => {
       setSt((prev) => {
         const co = (prev.corridas || []).find((x) => x.id === id);
         if (!co) return prev;
@@ -296,12 +302,18 @@ function InnerApp() {
           .filter((c) => co.compromisoIds.includes(c.id))
           .forEach((c) => {
             const bId = c.bancoAsignadoId || (prev.bancos || []).find((b) => b.moneda === "BS")?.id;
-            const montoPend = c.montoOriginal; // Simplificado al total del compromiso
+            // El pedido vive en USD; la corrida se paga en Bs — convertimos con
+            // la tasa que corresponda según la forma de pago de este compromiso
+            // (BCV, Paralelo o Euro), igual que el pago individual manual.
+            const tasaAplicable = tasaSegunFormaPago(prev, c.formaPago || c.moneda);
+            const montoBs = tasaAplicable !== null ? Number(c.montoOriginal) * tasaAplicable : Number(c.montoOriginal);
 
             nuevosMovimientos.push({
               id: crypto.randomUUID(),
               compromisoId: c.id,
-              monto: montoPend,
+              monto: montoBs,
+              moneda: "BS",
+              tasaBcvPago: tasaAplicable !== null ? tasaAplicable : null,
               fecha: new Date().toISOString().slice(0, 10),
               tipo: "TRANSFERENCIA",
               bancoOrigenId: bId,
@@ -314,7 +326,7 @@ function InnerApp() {
               if (idx !== -1) {
                 nuevosBancos[idx] = {
                   ...nuevosBancos[idx],
-                  saldoActual: Number(nuevosBancos[idx].saldoActual) - Number(montoPend)
+                  saldoActual: Number(nuevosBancos[idx].saldoActual) - Number(montoBs)
                 };
               }
             }
@@ -322,7 +334,7 @@ function InnerApp() {
 
         const next = {
           ...prev,
-          corridas: (prev.corridas || []).map((x) => (x.id === id ? { ...x, estado: "EJECUTADA" } : x)),
+          corridas: (prev.corridas || []).map((x) => (x.id === id ? { ...x, estado: "EJECUTADA", ejecutadoPorAdmin: ejecutadoPor || null, fechaEjecucion: new Date().toISOString().slice(0, 10) } : x)),
           movimientos: nuevosMovimientos,
           bancos: nuevosBancos
         };

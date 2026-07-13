@@ -1,13 +1,13 @@
 /* ============================================================
-   MODO CLARO / OSCURO Â· El Maizalito
+   MODO CLARO / OSCURO · El Maizalito
    ------------------------------------------------------------
-   Todos los colores de la app viven aquÃ­ como variables CSS.
-   theme.js simplemente los referencia (var(--ink), etc.), asÃ­
-   que cambiar de modo no requiere tocar ningÃºn componente.
+   Todos los colores de la app viven aquí como variables CSS.
+   theme.js simplemente los referencia (var(--ink), etc.), así
+   que cambiar de modo no requiere tocar ningún componente.
 
    Comportamiento:
    - Sin el atributo data-theme (o data-theme="auto"): sigue la
-     preferencia del sistema operativo automÃ¡ticamente.
+     preferencia del sistema operativo automáticamente.
    - data-theme="light" / data-theme="dark": fuerza el modo,
      sin importar el sistema operativo.
    ============================================================ */
@@ -40,7 +40,7 @@
   --mut-soft: #EEF1EC;
   --rojo-line: #EDD3D0;
 
-  /* Liquid glass: superficies translÃºcidas con desenfoque */
+  /* Liquid glass: superficies translúcidas con desenfoque */
   --glass-bg: rgba(255,255,255,0.62);
   --glass-bg-strong: rgba(255,255,255,0.78);
   --glass-border: rgba(255,255,255,0.55);
@@ -55,7 +55,7 @@
   color-scheme: light;
 }
 
-/* Modo oscuro automÃ¡tico: solo cuando el usuario no forzÃ³ un modo */
+/* Modo oscuro automático: solo cuando el usuario no forzó un modo */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
     --ink: #EDEFE8;
@@ -157,11 +157,11 @@ body {
 }
 
 /* ------------------------------------------------------------
-   Hover del Sidebar (los Ã­tems de navegaciÃ³n de la captura)
+   Hover del Sidebar (los ítems de navegación de la captura)
    ------------------------------------------------------------
-   El fondo del Ã­tem activo se sigue fijando en lÃ­nea (inline)
-   desde React; el hover solo aplica cuando el Ã­tem NO estÃ¡
-   activo, asÃ­ que no compite con el estilo del item activo.
+   El fondo del ítem activo se sigue fijando en línea (inline)
+   desde React; el hover solo aplica cuando el ítem NO está
+   activo, así que no compite con el estilo del item activo.
    ------------------------------------------------------------ */
 .cad-sidebar-item {
   background-color: transparent;
@@ -186,8 +186,8 @@ body {
 }
 
 /* ------------------------------------------------------------
-   Liquid glass â€” manchas de color decorativas detrÃ¡s del sidebar
-   y la barra superior, para que el desenfoque translÃºcido tenga
+   Liquid glass — manchas de color decorativas detrás del sidebar
+   y la barra superior, para que el desenfoque translúcido tenga
    algo de color que desenfocar (igual que los fondos de Apple).
    ------------------------------------------------------------ */
 .cad-glass-blob {
@@ -229,6 +229,20 @@ body {
   .cad-ticker-track { animation: none; }
 }
 
+/* Segmented deslizable en móvil: el scroll funciona, pero sin la barra fea */
+.cad-segmented-scroll {
+  scrollbar-width: none; /* Firefox */
+}
+.cad-segmented-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Tablas con scroll horizontal: en iOS, que el deslizado se sienta
+   suave/nativo (sin esto, a veces se siente "trabado" al arrastrar). */
+.cad-table-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
 .cad-spin {
   animation: cad-spin-rotate 1s linear infinite;
 }
@@ -237,7 +251,7 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* Celdas del calendario de pagos: hover suave + transiciÃ³n al cambiar de mes */
+/* Celdas del calendario de pagos: hover suave + transición al cambiar de mes */
 .cad-cal-day {
   transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
 }

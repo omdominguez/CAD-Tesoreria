@@ -1,10 +1,11 @@
 /* ============================================================
    FUENTES EXTERNAS DE TASAS DE CAMBIO
    ------------------------------------------------------------
-   BCV y Paralelo se sincronizan solos todos los días (DolarApi
-   Venezuela como principal, con dos respaldos por si esa falla).
-   Cada tasa intenta varias fuentes en orden; si todas fallan,
-   devuelve null y la app simplemente deja la tasa en manual ese día.
+   BCV ($ y €) se leen directo del JSON oficial de Banco de
+   Venezuela (confirmado por el usuario). Paralelo sigue con
+   DolarApi Venezuela, que ya funcionaba bien. Cada tasa intenta
+   varias fuentes en orden; si todas fallan, devuelve null y la
+   app simplemente deja la tasa en manual ese día.
    ============================================================ */
 
 async function fetchJSON(url) {
@@ -35,8 +36,39 @@ function extraerValor(data) {
   return val && val > 0 ? val : null;
 }
 
-/** Tasa oficial BCV (USD): DolarApi Venezuela, con respaldo en dolar-vzla.rafnixg.dev. */
+/**
+ * Fuente oficial de BCV ($ y €) juntos. Usamos chitty-bcv-api (alojada en
+ * GitHub Pages, confirmada por el usuario) como principal — a diferencia
+ * del JSON directo del Banco de Venezuela, este sí permite pedirse desde
+ * el navegador (GitHub Pages no bloquea peticiones de otras páginas).
+ * El del Banco de Venezuela queda como respaldo por si algún día cambia.
+ */
+export async function fetchTasasBDV() {
+  try {
+    const data = await fetchJSON("https://chitty400.github.io/chitty-bcv-api/latest.json");
+    const dolar = normalizarNumero(data?.tasas?.usd ?? data?.tasa_bcv);
+    const euro = normalizarNumero(data?.tasas?.eur);
+    if (dolar || euro) return { dolar: dolar > 0 ? dolar : null, euro: euro > 0 ? euro : null };
+  } catch (e) {
+    console.warn("chitty-bcv-api: falló", e.message);
+  }
+
+  try {
+    const data = await fetchJSON("https://www.bancodevenezuela.com/files/tasas/tasas2.json");
+    const dolar = normalizarNumero(data?.mesacambio?.bcv?.dolares);
+    const euro = normalizarNumero(data?.mesacambio?.bcv?.euros);
+    return { dolar: dolar > 0 ? dolar : null, euro: euro > 0 ? euro : null };
+  } catch (e) {
+    console.warn("BDV (tasas2.json): falló", e.message);
+    return { dolar: null, euro: null };
+  }
+}
+
+/** Tasa oficial BCV (USD): Banco de Venezuela directo, con respaldo en DolarApi. */
 export async function fetchTasaBCV() {
+  const { dolar } = await fetchTasasBDV();
+  if (dolar) return dolar;
+
   const fuentes = [
     "https://ve.dolarapi.com/v1/dolares/oficial",
     "https://dolar-vzla.rafnixg.dev/api/v1/bcv/dolar",
@@ -67,6 +99,12 @@ export async function fetchTasaParalelo() {
     }
   }
   return null;
+}
+
+/** Tasa BCV Euro: Banco de Venezuela directo (el endpoint de DolarApi que se intentó antes no respondía). */
+export async function fetchTasaBcvEuro() {
+  const { euro } = await fetchTasasBDV();
+  return euro || null;
 }
 
 /*

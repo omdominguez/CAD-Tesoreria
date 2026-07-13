@@ -42,7 +42,7 @@ export function startWeek(d) {
    ============================================================ */
 export const hoyStr = () => new Date().toISOString().slice(0, 10);
 
-const TASAS_KEYS = ["tasaBCV", "tasaIntervencion", "tasaParalelo"];
+const TASAS_KEYS = ["tasaBCV", "tasaIntervencion", "tasaParalelo", "tasaBcvEuro"];
 
 /** Devuelve un nuevo estado con la foto de hoy actualizada en historialTasas. */
 export function conSnapshotDeHoy(state) {
@@ -73,7 +73,7 @@ export function variacionTasas(state) {
   const fechaBase = fechaAnteriorMasReciente(historial);
   const base = fechaBase ? historial[fechaBase] : null;
 
-  const LABELS = { tasaBCV: "BCV", tasaIntervencion: "Intervención", tasaParalelo: "Paralelo" };
+  const LABELS = { tasaBCV: "BCV", tasaIntervencion: "Intervención", tasaParalelo: "Paralelo", tasaBcvEuro: "BCV Euro" };
 
   return TASAS_KEYS.map((k) => {
     const valor = Number(cfg[k]) || 0;
@@ -150,23 +150,65 @@ export const esCli = (c) => c.esCliente === true;
    Cuentas por Pagar (CxP - Compras)
    ============================================================ */
 export const movsDe = (st, cid) => (st.movimientos || []).filter((m) => m.compromisoId === cid);
-export const pagadoDe = (st, cid) => movsDe(st, cid).reduce((a, m) => a + Number(m.monto), 0);
-export const pendienteDe = (st, c) => Math.max(0, Number(c.montoOriginal) - pagadoDe(st, c.id));
+/**
+ * Cuánto se ha pagado de un compromiso, expresado en SU MISMA moneda
+ * (c.moneda) — aunque el pago se haya hecho en otra moneda distinta
+ * (ej. pedido en USD pagado en Bs), se convierte usando la tasa que
+ * quedó registrada en ese movimiento puntual (o la tasa actual como
+ * respaldo, para movimientos antiguos que no la tenían guardada).
+ */
+export const pagadoDe = (st, c) => {
+  const monedaObjetivo = c.moneda;
+  return movsDe(st, c.id).reduce((a, m) => {
+    if (!m.moneda || m.moneda === monedaObjetivo) return a + Number(m.monto);
+    const tasa = Number(m.tasaBcvPago) || Number(st.config.tasaBCV) || 1;
+    if (monedaObjetivo === "USD" && m.moneda === "BS") return a + Number(m.monto) / tasa;
+    if (monedaObjetivo === "BS" && m.moneda === "USD") return a + Number(m.monto) * tasa;
+    return a + Number(m.monto);
+  }, 0);
+};
+export const pendienteDe = (st, c) => Math.max(0, Number(c.montoOriginal) - pagadoDe(st, c));
 
 export function estadoDe(st, c) {
   if (c.anulado) return "ANULADO";
   const pend = pendienteDe(st, c);
   if (pend <= 0.005) return "PAGADO";
-  if (pagadoDe(st, c.id) > 0) return "PARCIAL";
+  if (pagadoDe(st, c) > 0) return "PARCIAL";
   return "PENDIENTE";
 }
 
 export const activo = (st, c) => !c.anulado && ["PENDIENTE", "PARCIAL"].includes(estadoDe(st, c));
 
 // Tasa histórica del registro para evitar fluctuaciones en la deuda pasada
+/**
+ * Traduce la "forma de pago" elegida en el pedido (informativa) a la
+ * tasa de Bs que corresponde aplicar EN ESE MOMENTO (siempre la tasa
+ * vigente hoy, no una guardada en el pasado — así se recalcula bien
+ * sin importar cuándo se termine pagando).
+ *
+ * @returns {number|null} la tasa a usar, o null si la forma de pago es USD directo
+ */
+export function tasaSegunFormaPago(st, formaPago) {
+  const cfg = st.config || {};
+  switch (formaPago) {
+    case "BS_PARALELO": return Number(cfg.tasaParalelo) || 1;
+    case "BS_BCV_EUR": return Number(cfg.tasaBcvEuro) || 1;
+    case "BS_BCV": return Number(cfg.tasaBCV) || 1;
+    case "BS": return Number(cfg.tasaBCV) || 1; // compatibilidad con pedidos antiguos (binario USD/BS)
+    default: return null; // "USD" — sin conversión
+  }
+}
+
+export const FORMAS_PAGO = [
+  { id: "USD", label: "Dólares (USD)" },
+  { id: "BS_BCV", label: "Bolívares — tasa BCV ($)" },
+  { id: "BS_PARALELO", label: "Bolívares — tasa Paralelo" },
+  { id: "BS_BCV_EUR", label: "Bolívares — tasa BCV (€)" }
+];
+
 export const tasaDe = (st, c) => Number(c.tasaBcvRegistro || st.config.tasaBCV) || 1;
 export const usdComp = (st, c) => c.moneda === "USD" ? pendienteDe(st, c) : pendienteDe(st, c) / tasaDe(st, c);
-export const usdPagado = (st, c) => c.moneda === "USD" ? pagadoDe(st, c.id) : pagadoDe(st, c.id) / tasaDe(st, c);
+export const usdPagado = (st, c) => c.moneda === "USD" ? pagadoDe(st, c) : pagadoDe(st, c) / tasaDe(st, c);
 
 export const pedidosProv = (st, pid) => (st.compromisos || []).filter((c) => c.proveedorId === pid && !c.anulado);
 export const pendienteProv = (st, pid) => pedidosProv(st, pid).reduce((a, c) => a + usdComp(st, c), 0);

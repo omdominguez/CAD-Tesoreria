@@ -3,7 +3,7 @@ import React, { useState } from "react";
 // Tema y finanzas
 import { C, FONTS } from "../../constants/theme";
 import { nf, hoyStr } from "../../utils/finance";
-import { fetchTasaBCV, fetchTasaParalelo, fetchSugerenciaIntervencion } from "../../utils/tasasExternas";
+import { fetchTasaBCV, fetchTasaParalelo, fetchSugerenciaIntervencion, fetchTasasBDV } from "../../utils/tasasExternas";
 
 // Componentes UI
 import { Section, Card } from "../../components/ui/Layout";
@@ -17,9 +17,10 @@ export default function AjustesTasas({ st, act }) {
 
   // Definición de las tasas que queremos manejar y sus colores asociados
   const rates = [
-    { k: "tasaBCV", lbl: "BCV (oficial)", tone: C.green, auto: true },
+    { k: "tasaBCV", lbl: "BCV (oficial, USD)", tone: C.green, auto: true },
     { k: "tasaIntervencion", lbl: "Intervención", tone: C.gold, auto: false },
-    { k: "tasaParalelo", lbl: "Mercado paralelo", tone: C.rojo, auto: true }
+    { k: "tasaParalelo", lbl: "Mercado paralelo", tone: C.rojo, auto: true },
+    { k: "tasaBcvEuro", lbl: "BCV (Euro)", tone: C.azul, auto: true }
   ];
 
   const hoy = hoyStr();
@@ -28,20 +29,27 @@ export default function AjustesTasas({ st, act }) {
   const actualizarAhora = async () => {
     setSincronizando(true);
     setResultado(null);
-    const [bcv, paralelo, sugerencia] = await Promise.all([
-      fetchTasaBCV(),
+    // El dólar y el euro del BCV salen del MISMO archivo — lo pedimos una
+    // sola vez (en paralelo con Paralelo e Intervención, que son fuentes
+    // distintas) en vez de pedirlo dos veces por separado.
+    const [bdv, paralelo, sugerencia] = await Promise.all([
+      fetchTasasBDV(),
       fetchTasaParalelo(),
       fetchSugerenciaIntervencion()
     ]);
+    const bcv = bdv.dolar || await fetchTasaBCV(); // respaldo solo si BDV falló
+    const euro = bdv.euro;
+
     if (bcv) act.setRate("tasaBCV", String(bcv));
     if (paralelo) act.setRate("tasaParalelo", String(paralelo));
+    if (euro) act.setRate("tasaBcvEuro", String(euro));
     act.marcarTasasAutoActualizadas(hoy);
     setSugerenciaInterv(sugerencia);
 
-    const logros = [bcv && "BCV", paralelo && "Paralelo"].filter(Boolean);
+    const logros = [bcv && "BCV", paralelo && "Paralelo", euro && "Euro"].filter(Boolean);
     setResultado(
       logros.length
-        ? `Actualizado: ${logros.join(" y ")}.`
+        ? `Actualizado: ${logros.join(", ")}.`
         : "No se pudo contactar la fuente externa. Puedes seguir editando las tasas manualmente."
     );
     setSincronizando(false);
@@ -55,7 +63,7 @@ export default function AjustesTasas({ st, act }) {
         <div style={{ textAlign: "right" }}>
           <Btn small variant="ghost" onClick={actualizarAhora} disabled={sincronizando}>
             <RefreshCw size={13} className={sincronizando ? "cad-spin" : ""} />
-            {sincronizando ? "Actualizando…" : "Actualizar BCV y Paralelo ahora"}
+            {sincronizando ? "Actualizando…" : "Actualizar BCV, Paralelo y Euro ahora"}
           </Btn>
           <div style={{ fontSize: 11, color: C.mut, marginTop: 6 }}>
             {sincronizadoHoy ? "✓ Sincronizado automáticamente hoy" : "Aún no se ha sincronizado hoy"}
@@ -125,9 +133,9 @@ export default function AjustesTasas({ st, act }) {
       </div>
 
       <div style={{ fontSize: 11.5, color: C.mut, marginTop: 16, maxWidth: 640 }}>
-        BCV y Paralelo se intentan sincronizar solos una vez al día (cuando un Master o Tesorería
-        abre la app). Intervención se mantiene manual porque no existe una fuente pública que
-        publique exactamente ese dato — al actualizar verás una sugerencia calculada (promedio
+        BCV, Paralelo y BCV Euro se intentan sincronizar solos una vez al día (cuando un Master o
+        Tesorería abre la app). Intervención se mantiene manual porque no existe una fuente pública
+        que publique exactamente ese dato — al actualizar verás una sugerencia calculada (promedio
         entre BCV y Paralelo) que puedes aceptar con un clic o ignorar y seguir con tu propio número.
       </div>
     </Section>

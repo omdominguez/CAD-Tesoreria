@@ -59,7 +59,7 @@ export default function GestorContactos({ st, act }) {
         />
       ) : (
         <Card>
-          <div style={{ overflowX: "auto" }}>
+          <div className="cad-table-scroll" style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>

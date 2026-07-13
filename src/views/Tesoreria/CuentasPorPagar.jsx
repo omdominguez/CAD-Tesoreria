@@ -10,6 +10,7 @@ import {
   fmtD, 
   money, 
   pendienteDe,
+  tasaSegunFormaPago,
   TIPOS_MOV 
 } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
@@ -54,12 +55,20 @@ export default function CuentasPorPagar({ st, act, rol }) {
   };
 
   const abrirPago = (c) => {
+    const formaPago = c.formaPago || c.moneda || "USD"; // compatibilidad con pedidos antiguos
+    const pendienteUSD = pendienteDe(st, c); // los pedidos siempre se registran en USD
+    const tasaAplicable = tasaSegunFormaPago(st, formaPago); // null si es USD directo
+    const esEnBs = tasaAplicable !== null;
+    const etiquetaTasa = { BS_BCV: "BCV ($)", BS_PARALELO: "Paralelo", BS_BCV_EUR: "BCV (€)", BS: "BCV ($)" }[formaPago] || "";
+
     setF({ 
       compromisoId: c.id, 
       tipo: "TRANSFERENCIA", 
-      monto: pendienteDe(st, c), 
-      moneda: c.moneda, 
-      bancoOrigenId: c.bancoAsignadoId || (st.bancos || []).find((b) => b.moneda === c.moneda)?.id || "", 
+      monto: esEnBs ? Number((pendienteUSD * tasaAplicable).toFixed(2)) : pendienteUSD, 
+      moneda: esEnBs ? "BS" : "USD", 
+      tasaBcvPago: esEnBs ? tasaAplicable : null,
+      etiquetaTasa,
+      bancoOrigenId: c.bancoAsignadoId || (st.bancos || []).find((b) => b.moneda === (esEnBs ? "BS" : "USD"))?.id || "", 
       referencia: "", 
       adjuntos: [] 
     });
@@ -88,7 +97,7 @@ export default function CuentasPorPagar({ st, act, rol }) {
         <Empty icon={CreditCard} title="Nada por pagar" msg="No hay compromisos en este filtro." />
       ) : (
         <Card>
-          <div style={{ overflowX: "auto" }}>
+          <div className="cad-table-scroll" style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
@@ -217,13 +226,20 @@ function PagarProveedorModal({ st, initialData, onClose, onSave }) {
 
   return (
     <Modal title="Registrar pago a proveedor" onClose={onClose}>
+      {f.tasaBcvPago && (
+        <div style={{ background: C.greenSoft, color: C.greenDk, padding: "9px 12px", borderRadius: 10, fontSize: 12, marginBottom: 14 }}>
+          Este pedido se paga en Bs — el monto se calculó con la tasa {f.etiquetaTasa || "vigente"} de hoy (<b>{money(f.tasaBcvPago, "BS").replace("Bs", "Bs.")}</b> por USD).
+          Si la tasa cambió desde que abriste esta pantalla, ajusta el monto manualmente.
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Tipo de egreso">
           <Select value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>
             {TIPOS_MOV.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </Select>
         </Field>
-        <Field label="Monto">
+        <Field label={`Monto a transferir (${f.moneda === "BS" ? "Bs" : "USD"})`}>
           <Input type="number" value={f.monto} onChange={(e) => setF({ ...f, monto: e.target.value })} />
         </Field>
       </div>

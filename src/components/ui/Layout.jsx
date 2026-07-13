@@ -1,6 +1,7 @@
 import React from "react";
 import { X } from "lucide-react";
 import { C, FONTS, UI } from "../../constants/theme";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 /* ============================================================
    COMPONENTES DE UI BÁSICOS
@@ -21,6 +22,7 @@ export function Card({ children, style }) {
 }
 
 export function Modal({ title, onClose, children, wide }) {
+  const isMobile = useIsMobile();
   return (
     <div 
       onClick={onClose} 
@@ -31,9 +33,9 @@ export function Modal({ title, onClose, children, wide }) {
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
         display: "flex", 
-        alignItems: "flex-start", 
+        alignItems: isMobile ? "flex-end" : "flex-start", 
         justifyContent: "center", 
-        padding: "5vh 16px", 
+        padding: isMobile ? 0 : "5vh 16px", 
         zIndex: 50, 
         overflowY: "auto" 
       }}
@@ -44,9 +46,9 @@ export function Modal({ title, onClose, children, wide }) {
           background: "var(--glass-bg-strong)",
           backdropFilter: "blur(var(--glass-blur)) saturate(180%)",
           WebkitBackdropFilter: "blur(var(--glass-blur)) saturate(180%)",
-          borderRadius: UI.RADIUS + 2, 
+          borderRadius: isMobile ? "18px 18px 0 0" : UI.RADIUS + 2, 
           width: "100%", 
-          maxWidth: wide ? 900 : 480, 
+          maxWidth: isMobile ? "100%" : (wide ? 900 : 480), 
           boxShadow: `${UI.SHADOW_MODAL}, var(--glass-highlight)`,
           border: "1px solid var(--glass-border)",
         }}
@@ -55,10 +57,10 @@ export function Modal({ title, onClose, children, wide }) {
           display: "flex", 
           justifyContent: "space-between", 
           alignItems: "center", 
-          padding: "16px 22px", 
+          padding: isMobile ? "14px 16px" : "16px 22px", 
           borderBottom: `1px solid ${C.line}` 
         }}>
-          <div style={{ fontFamily: FONTS.SANS, fontSize: 16, fontWeight: 700, color: C.ink, letterSpacing: -0.2 }}>
+          <div style={{ fontFamily: FONTS.SANS, fontSize: isMobile ? 15 : 16, fontWeight: 700, color: C.ink, letterSpacing: -0.2 }}>
             {title}
           </div>
           <button 
@@ -66,20 +68,21 @@ export function Modal({ title, onClose, children, wide }) {
             style={{ 
               background: C.paper, 
               border: `1px solid ${C.line}`, 
-              width: 30, 
-              height: 30, 
+              width: 34, 
+              height: 34, 
               borderRadius: UI.RADIUS_SM, 
               cursor: "pointer", 
               color: C.mut, 
               display: "inline-flex", 
               alignItems: "center", 
-              justifyContent: "center" 
+              justifyContent: "center",
+              flexShrink: 0
             }}
           >
-            <X size={17} />
+            <X size={18} />
           </button>
         </div>
-        <div style={{ padding: 22, maxHeight: "80vh", overflowY: "auto" }}>
+        <div style={{ padding: isMobile ? 16 : 22, maxHeight: isMobile ? "85vh" : "80vh", overflowY: "auto" }}>
           {children}
         </div>
       </div>
@@ -114,6 +117,7 @@ export function Empty({ icon: Icon, title, msg, action }) {
 }
 
 export function Section({ title, desc, action, children, eyebrow }) {
+  const isMobile = useIsMobile();
   return (
     <div>
       <div style={{ 
@@ -122,7 +126,7 @@ export function Section({ title, desc, action, children, eyebrow }) {
         alignItems: "flex-end", 
         flexWrap: "wrap", 
         gap: 10, 
-        marginBottom: 18 
+        marginBottom: isMobile ? 14 : 18 
       }}>
         <div>
           {eyebrow && (
@@ -130,7 +134,7 @@ export function Section({ title, desc, action, children, eyebrow }) {
               {eyebrow}
             </div>
           )}
-          <h2 style={{ fontFamily: FONTS.SANS, fontSize: 22, fontWeight: 800, color: C.ink, margin: 0, letterSpacing: -0.4 }}>
+          <h2 style={{ fontFamily: FONTS.SANS, fontSize: isMobile ? 19 : 22, fontWeight: 800, color: C.ink, margin: 0, letterSpacing: -0.4 }}>
             {title}
           </h2>
           {desc && (

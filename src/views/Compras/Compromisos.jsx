@@ -103,7 +103,7 @@ export default function Compromisos({ st, act, rol }) {
             />
           ) : (
             <Card>
-              <div style={{ overflowX: "auto" }}>
+              <div className="cad-table-scroll" style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
@@ -155,8 +155,8 @@ export default function Compromisos({ st, act, rol }) {
                           <Td>{fmtD(c.fechaVencimiento)}</Td>
                           <Td right>{money(c.montoOriginal, c.moneda)}</Td>
                           <Td right>
-                            {pagadoDe(st, c.id) > 0 ? (
-                              <span style={{ color: C.verde }}>{money(pagadoDe(st, c.id), c.moneda)}</span>
+                            {pagadoDe(st, c) > 0 ? (
+                              <span style={{ color: C.verde }}>{money(pagadoDe(st, c), c.moneda)}</span>
                             ) : (
                               <span style={{ color: C.mut }}>—</span>
                             )}

@@ -91,12 +91,13 @@ export async function exportarCorridaPDF(corrida, items, opciones = {}) {
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF();
 
-  const VERDE = [20, 83, 43];
+  const NAVY = [1, 45, 55]; // CAD Navy #012D37 (institucional)
+  const VERDE = [0, 135, 71]; // Verde agro CAD #008747
   const GRIS = [120, 120, 120];
   let y = 18;
 
   doc.setFontSize(18);
-  doc.setTextColor(...VERDE);
+  doc.setTextColor(...NAVY);
   doc.text("El Maizalito · CAD Venezuela", 14, y);
   y += 6;
   doc.setFontSize(9);
@@ -104,7 +105,7 @@ export async function exportarCorridaPDF(corrida, items, opciones = {}) {
   doc.text("Comercializadora Agrícola Domínguez, C.A. · RIF J-30386970-0", 14, y);
   y += 12;
 
-  doc.setDrawColor(...VERDE);
+  doc.setDrawColor(...NAVY);
   doc.setLineWidth(0.6);
   doc.line(14, y, 196, y);
   y += 10;
@@ -156,4 +157,141 @@ export async function exportarCorridaPDF(corrida, items, opciones = {}) {
   doc.text(`Documento generado digitalmente el ${new Date().toLocaleDateString("es-VE")} — CAD Tesorería`, 14, 285);
 
   doc.save(`${corrida.codigo}.pdf`);
+}
+
+/** PDF del resumen financiero mensual — KPIs arriba, tablas de detalle abajo. */
+export async function exportarReporteMensualPDF(reporte) {
+  const { jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+  const doc = new jsPDF();
+
+  const NAVY = [1, 45, 55]; // CAD Navy #012D37 (institucional)
+  const VERDE = [0, 135, 71]; // Verde agro CAD #008747
+  const GRIS = [120, 120, 120];
+  const fmt = (n) => "$ " + Number(n || 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let y = 18;
+
+  doc.setFontSize(18);
+  doc.setTextColor(...NAVY);
+  doc.text("El Maizalito · CAD Venezuela", 14, y);
+  y += 6;
+  doc.setFontSize(9);
+  doc.setTextColor(...GRIS);
+  doc.text("Comercializadora Agrícola Domínguez, C.A. · RIF J-30386970-0", 14, y);
+  y += 12;
+
+  doc.setDrawColor(...NAVY);
+  doc.setLineWidth(0.6);
+  doc.line(14, y, 196, y);
+  y += 10;
+
+  doc.setFontSize(15);
+  doc.setTextColor(20, 20, 20);
+  doc.text(`Resumen Financiero — ${reporte.etiqueta}`, 14, y);
+  y += 12;
+
+  autoTable(doc, {
+    startY: y,
+    head: [["", "Cantidad", "Total (USD)"]],
+    body: [
+      ["Compras registradas", reporte.compras.cantidad, fmt(reporte.compras.totalUSD)],
+      ["Pagos realizados", reporte.pagos.cantidad, fmt(reporte.pagos.totalUSD)],
+      ["Facturas de venta", reporte.ventas.cantidad, fmt(reporte.ventas.totalUSD)],
+      ["Cobros recibidos", reporte.cobros.cantidad, fmt(reporte.cobros.totalUSD)],
+    ],
+    foot: [["Balance neto del mes (cobros − pagos)", "", fmt(reporte.balanceNeto)]],
+    styles: { fontSize: 9, cellPadding: 4 },
+    headStyles: { fillColor: VERDE },
+    footStyles: { fillColor: [235, 237, 228], textColor: 20, fontStyle: "bold" }
+  });
+  y = doc.lastAutoTable.finY + 14;
+
+  if (reporte.porCategoria.length) {
+    doc.setFontSize(11);
+    doc.setTextColor(20, 20, 20);
+    doc.text("Compras por categoría", 14, y);
+    y += 4;
+    autoTable(doc, {
+      startY: y + 2,
+      head: [["Categoría", "Total (USD)"]],
+      body: reporte.porCategoria.map((c) => [c.categoria, fmt(c.totalUSD)]),
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [100, 100, 100] },
+    });
+    y = doc.lastAutoTable.finY + 14;
+  }
+
+  if (y > 230) { doc.addPage(); y = 20; }
+
+  if (reporte.topProveedores.length) {
+    doc.setFontSize(11);
+    doc.text("Proveedores más pagados", 14, y);
+    y += 4;
+    autoTable(doc, {
+      startY: y + 2,
+      head: [["Proveedor", "Total pagado (USD)"]],
+      body: reporte.topProveedores.map((p) => [p.nombre, fmt(p.totalUSD)]),
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [166, 115, 10] },
+    });
+    y = doc.lastAutoTable.finY + 14;
+  }
+
+  if (y > 250) { doc.addPage(); y = 20; }
+
+  if (reporte.topClientes.length) {
+    doc.setFontSize(11);
+    doc.text("Clientes que más pagaron", 14, y);
+    y += 4;
+    autoTable(doc, {
+      startY: y + 2,
+      head: [["Cliente", "Total cobrado (USD)"]],
+      body: reporte.topClientes.map((c) => [c.nombre, fmt(c.totalUSD)]),
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: VERDE },
+    });
+  }
+
+  doc.setFontSize(8);
+  doc.setTextColor(...GRIS);
+  doc.text(`Generado digitalmente el ${new Date().toLocaleDateString("es-VE")} — CAD Tesorería`, 14, 290);
+
+  doc.save(`resumen_${reporte.etiqueta.replace(" ", "_").toLowerCase()}.pdf`);
+}
+
+/** Excel multi-hoja del resumen financiero mensual. */
+export async function exportarReporteMensualExcel(reporte) {
+  const XLSX = await import("xlsx");
+  const libro = XLSX.utils.book_new();
+
+  const resumen = [
+    { Concepto: "Compras registradas", Cantidad: reporte.compras.cantidad, "Total (USD)": reporte.compras.totalUSD },
+    { Concepto: "Pagos realizados", Cantidad: reporte.pagos.cantidad, "Total (USD)": reporte.pagos.totalUSD },
+    { Concepto: "Facturas de venta", Cantidad: reporte.ventas.cantidad, "Total (USD)": reporte.ventas.totalUSD },
+    { Concepto: "Cobros recibidos", Cantidad: reporte.cobros.cantidad, "Total (USD)": reporte.cobros.totalUSD },
+    { Concepto: "Balance neto (cobros − pagos)", Cantidad: "", "Total (USD)": reporte.balanceNeto },
+  ];
+  const hojaResumen = XLSX.utils.json_to_sheet(resumen);
+  hojaResumen["!cols"] = [{ wch: 32 }, { wch: 12 }, { wch: 16 }];
+  XLSX.utils.book_append_sheet(libro, hojaResumen, "Resumen");
+
+  if (reporte.porCategoria.length) {
+    const hoja = XLSX.utils.json_to_sheet(reporte.porCategoria.map((c) => ({ Categoría: c.categoria, "Total (USD)": c.totalUSD })));
+    hoja["!cols"] = [{ wch: 24 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(libro, hoja, "Compras por categoría");
+  }
+
+  if (reporte.topProveedores.length) {
+    const hoja = XLSX.utils.json_to_sheet(reporte.topProveedores.map((p) => ({ Proveedor: p.nombre, "Total pagado (USD)": p.totalUSD })));
+    hoja["!cols"] = [{ wch: 28 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(libro, hoja, "Top proveedores");
+  }
+
+  if (reporte.topClientes.length) {
+    const hoja = XLSX.utils.json_to_sheet(reporte.topClientes.map((c) => ({ Cliente: c.nombre, "Total cobrado (USD)": c.totalUSD })));
+    hoja["!cols"] = [{ wch: 28 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(libro, hoja, "Top clientes");
+  }
+
+  XLSX.writeFile(libro, `resumen_${reporte.etiqueta.replace(" ", "_").toLowerCase()}.xlsx`);
 }

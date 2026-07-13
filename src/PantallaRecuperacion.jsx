@@ -50,7 +50,7 @@ export default function PantallaRecuperacion() {
               <div style={{ fontSize: 13, color: C.mut, marginBottom: 20 }}>Ya puedes iniciar sesión con tu nueva contraseña.</div>
               <button
                 onClick={async () => { await signOut(); salirDeRecuperacion(); }}
-                style={{ width: "100%", padding: "11px", background: C.ink, color: "#fff", border: "none", borderRadius: UI.RADIUS_SM, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.SANS }}
+                style={{ width: "100%", padding: "11px", background: C.gold, color: "#fff", border: "none", borderRadius: UI.RADIUS_SM, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.SANS }}
               >
                 Ir a iniciar sesión
               </button>
@@ -69,7 +69,7 @@ export default function PantallaRecuperacion() {
               <button
                 onClick={guardar}
                 disabled={busy}
-                style={{ width: "100%", padding: "11px", background: C.ink, color: "#fff", border: "none", borderRadius: UI.RADIUS_SM, fontSize: 14, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, fontFamily: FONTS.SANS }}
+                style={{ width: "100%", padding: "11px", background: C.gold, color: "#fff", border: "none", borderRadius: UI.RADIUS_SM, fontSize: 14, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, fontFamily: FONTS.SANS }}
               >
                 {busy ? "Guardando…" : "Guardar nueva contraseña"}
               </button>

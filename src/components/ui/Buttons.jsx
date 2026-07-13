@@ -23,7 +23,7 @@ export function Btn({ children, onClick, variant = "primary", small, disabled, t
     : { padding: "9px 15px", fontSize: 13.5 };
     
   const styles = {
-    primary: { background: C.ink, color: "#fff" },
+    primary: { background: C.gold, color: "#fff" },
     gold: { background: C.gold, color: "#fff" },
     ghost: { background: C.surface, color: C.ink, borderColor: C.line },
     soft: { background: C.greenSoft, color: C.greenDk },

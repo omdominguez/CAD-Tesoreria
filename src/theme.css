@@ -12,33 +12,60 @@
      sin importar el sistema operativo.
    ============================================================ */
 
+/* ============================================================
+   MODO CLARO / OSCURO · CAD Venezuela
+   ------------------------------------------------------------
+   Paleta tomada directo del Manual de Marca CAD v1.0 (abril 2026):
+     - CAD Navy #012D37 → ancla institucional (logo, textos de marca)
+     - Verde agro #008747 → secundario (positivo, aprobado, activo)
+     - Naranja energía #F77B1C → acento/CTA (botones principales)
+     - Ámbar #F8B345 → soporte (pendiente/advertencia)
+     - Danger #B23A3A / Info #2E6B8C → estados semánticos
+     - Neutrales: Tinta #333333, Apagado #666666, Línea #E5E7E8,
+       Superficie #F4F4F4, Papel #FFFFFF
+
+   El modo oscuro no viene en el manual (es un documento pensado
+   para impresos/digital claro) — se derivó manteniendo la misma
+   relación de tono entre colores, para que el sistema siga
+   sintiéndose "CAD" también de noche.
+
+   Comportamiento:
+   - Sin el atributo data-theme (o data-theme="auto"): sigue la
+     preferencia del sistema operativo automáticamente.
+   - data-theme="light" / data-theme="dark": fuerza el modo,
+     sin importar el sistema operativo.
+   ============================================================ */
+
 :root {
-  --ink: #12140F;
-  --mut: #626E5A;
-  --mut2: #8B9683;
-  --line: #DCDFD3;
-  --line-strong: #C7CBBB;
-  --paper: #F7F8F3;
-  --body: #EEF0E7;
+  --navy: #012D37;
+  --navy-soft: #E4EBEC;
+
+  --ink: #333333;
+  --mut: #666666;
+  --mut2: #98A0A1;
+  --line: #E5E7E8;
+  --line-strong: #D2D6D7;
+  --paper: #F4F4F4;
+  --body: #EFF1F1;
   --surface: #FFFFFF;
 
-  --green: #14532B;
-  --green-dk: #0B3620;
-  --green-soft: #E8F0E7;
+  --green: #008747;
+  --green-dk: #006233;
+  --green-soft: #E2F3EA;
 
-  --gold: #A9740A;
-  --gold-soft: #F6EFDA;
+  --gold: #F77B1C;
+  --gold-soft: #FDEBDB;
 
-  --rojo: #B3271E;
-  --rojo-soft: #FAEAE8;
-  --amar: #95690A;
-  --amar-soft: #FAF0D9;
-  --verde: #166A34;
-  --verde-soft: #E7F3EA;
-  --azul: #1D4ED8;
-  --azul-soft: #E8EEFD;
-  --mut-soft: #EEF1EC;
-  --rojo-line: #EDD3D0;
+  --rojo: #B23A3A;
+  --rojo-soft: #F8E7E7;
+  --amar: #C98418;
+  --amar-soft: #FCF1DD;
+  --verde: #008747;
+  --verde-soft: #E2F3EA;
+  --azul: #2E6B8C;
+  --azul-soft: #E4EDF1;
+  --mut-soft: #EDEEEE;
+  --rojo-line: #EBD2D2;
 
   /* Liquid glass: superficies translúcidas con desenfoque */
   --glass-bg: rgba(255,255,255,0.62);
@@ -46,8 +73,8 @@
   --glass-border: rgba(255,255,255,0.55);
   --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.7);
   --glass-blur: 22px;
-  --blob-a: rgba(20,83,43,0.30);
-  --blob-b: rgba(169,116,10,0.24);
+  --blob-a: rgba(1,45,55,0.28);
+  --blob-b: rgba(247,123,28,0.22);
 
   --shadow: 0 1px 2px rgba(18,20,15,0.03);
   --shadow-modal: 0 24px 60px rgba(10,14,10,0.20);
@@ -58,30 +85,33 @@
 /* Modo oscuro automático: solo cuando el usuario no forzó un modo */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --navy: #4A7C89;
+    --navy-soft: #16262B;
+
     --ink: #EDEFE8;
-    --mut: #93A08A;
-    --mut2: #616B5A;
+    --mut: #A2ACA2;
+    --mut2: #67716A;
     --line: #2B2E26;
     --line-strong: #3A3E34;
     --paper: #16180F;
     --body: #1D1F1A;
     --surface: #212319;
 
-    --green: #4C9A6A;
+    --green: #4FAE7A;
     --green-dk: #7FBF97;
-    --green-soft: #1D3324;
+    --green-soft: #1B3324;
 
-    --gold: #D6A84A;
-    --gold-soft: #332A16;
+    --gold: #FF9A4D;
+    --gold-soft: #3A2A18;
 
     --rojo: #E5837A;
     --rojo-soft: #3A2020;
     --amar: #E0B45A;
     --amar-soft: #362C16;
-    --verde: #5CB482;
-    --verde-soft: #1C3324;
-    --azul: #7CA2F0;
-    --azul-soft: #1B2740;
+    --verde: #4FAE7A;
+    --verde-soft: #1B3324;
+    --azul: #6FA0BE;
+    --azul-soft: #1C2C34;
     --mut-soft: #262920;
     --rojo-line: #4A2C2A;
 
@@ -91,8 +121,8 @@
     --glass-border: rgba(255,255,255,0.08);
     --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.06);
     --glass-blur: 22px;
-    --blob-a: rgba(76,154,106,0.26);
-    --blob-b: rgba(214,168,74,0.18);
+    --blob-a: rgba(74,124,137,0.26);
+    --blob-b: rgba(255,154,77,0.18);
 
     --shadow: 0 1px 2px rgba(0,0,0,0.28);
     --shadow-modal: 0 24px 60px rgba(0,0,0,0.55);
@@ -103,30 +133,33 @@
 
 /* Modo oscuro forzado manualmente (independiente del sistema operativo) */
 :root[data-theme="dark"] {
+  --navy: #4A7C89;
+  --navy-soft: #16262B;
+
   --ink: #EDEFE8;
-  --mut: #93A08A;
-  --mut2: #616B5A;
+  --mut: #A2ACA2;
+  --mut2: #67716A;
   --line: #2B2E26;
   --line-strong: #3A3E34;
   --paper: #16180F;
   --body: #1D1F1A;
   --surface: #212319;
 
-  --green: #4C9A6A;
+  --green: #4FAE7A;
   --green-dk: #7FBF97;
-  --green-soft: #1D3324;
+  --green-soft: #1B3324;
 
-  --gold: #D6A84A;
-  --gold-soft: #332A16;
+  --gold: #FF9A4D;
+  --gold-soft: #3A2A18;
 
   --rojo: #E5837A;
   --rojo-soft: #3A2020;
   --amar: #E0B45A;
   --amar-soft: #362C16;
-  --verde: #5CB482;
-  --verde-soft: #1C3324;
-  --azul: #7CA2F0;
-  --azul-soft: #1B2740;
+  --verde: #4FAE7A;
+  --verde-soft: #1B3324;
+  --azul: #6FA0BE;
+  --azul-soft: #1C2C34;
   --mut-soft: #262920;
   --rojo-line: #4A2C2A;
 
@@ -136,8 +169,8 @@
   --glass-border: rgba(255,255,255,0.08);
   --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.06);
   --glass-blur: 22px;
-  --blob-a: rgba(76,154,106,0.26);
-  --blob-b: rgba(214,168,74,0.18);
+  --blob-a: rgba(74,124,137,0.26);
+  --blob-b: rgba(255,154,77,0.18);
 
   --shadow: 0 1px 2px rgba(0,0,0,0.28);
   --shadow-modal: 0 24px 60px rgba(0,0,0,0.55);

@@ -89,18 +89,25 @@ export function variacionTasas(state) {
  * con otras): cuánto más cara es la paralela que la BCV, etc. Útil
  * para dimensionar de un vistazo la brecha cambiaria del día.
  */
+/**
+ * Compara cada tasa contra BCV Dólar (la referencia base), en vez de
+ * comparaciones cruzadas entre sí: "BCV Dólar vs Paralelo", "BCV Dólar
+ * vs Intervención", "BCV Dólar vs BCV Euro". Útil para dimensionar de
+ * un vistazo qué tan lejos está cada tasa de la oficial en dólares.
+ */
 export function comparativaEntreTasas(state) {
   const cfg = state.config || {};
   const bcv = Number(cfg.tasaBCV) || 0;
   const interv = Number(cfg.tasaIntervencion) || 0;
   const paralelo = Number(cfg.tasaParalelo) || 0;
+  const euro = Number(cfg.tasaBcvEuro) || 0;
 
   const brecha = (base, comparado) => (base > 0 ? ((comparado - base) / base) * 100 : null);
 
   return [
-    { key: "interv-bcv", label: "Intervención vs BCV", pct: brecha(bcv, interv) },
-    { key: "paralelo-bcv", label: "Paralelo vs BCV", pct: brecha(bcv, paralelo) },
-    { key: "paralelo-interv", label: "Paralelo vs Intervención", pct: brecha(interv, paralelo) },
+    { key: "bcv-paralelo", label: "BCV Dólar vs Paralelo", pct: brecha(bcv, paralelo) },
+    { key: "bcv-interv", label: "BCV Dólar vs Intervención", pct: brecha(bcv, interv) },
+    { key: "bcv-euro", label: "BCV Dólar vs BCV Euro", pct: brecha(bcv, euro) },
   ];
 }
 

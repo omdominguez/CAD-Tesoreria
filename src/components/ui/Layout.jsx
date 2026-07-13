@@ -134,7 +134,7 @@ export function Section({ title, desc, action, children, eyebrow }) {
               {eyebrow}
             </div>
           )}
-          <h2 style={{ fontFamily: FONTS.SANS, fontSize: isMobile ? 19 : 22, fontWeight: 800, color: C.ink, margin: 0, letterSpacing: -0.4 }}>
+          <h2 style={{ fontFamily: FONTS.SANS, fontSize: isMobile ? 19 : 22, fontWeight: 800, color: C.navy, margin: 0, letterSpacing: -0.4 }}>
             {title}
           </h2>
           {desc && (

@@ -1,9 +1,10 @@
 /* ============================================================
-   PALETA CAD · El Maizalito
-   Línea visual inspirada en Ramp: base neutra casi monocromática
-   (negro/blanco/grises) con el verde de marca como único acento,
-   bordes finos en vez de sombras pesadas, y tipografía sans-serif
-   bold para títulos y cifras.
+   PALETA CAD VENEZUELA · según Manual de Marca v1.0 (abril 2026)
+   ------------------------------------------------------------
+   CAD Navy ancla la identidad institucional; Verde agro respalda
+   lo positivo/aprobado; Naranja energía es el acento de llamada a
+   la acción (botones principales). Bordes finos, tipografía
+   Poppins (la operativa oficial de marca) para todo el sistema.
 
    Estos valores apuntan a variables CSS (ver src/theme.css), que
    cambian automáticamente entre modo claro y oscuro. Así ningún
@@ -12,21 +13,25 @@
    ============================================================ */
 export const C = {
   // Texto y superficies
-  ink: "var(--ink)",             // texto principal
-  mut: "var(--mut)",             // texto secundario / etiquetas
+  ink: "var(--ink)",             // texto principal (Tinta)
+  mut: "var(--mut)",             // texto secundario / etiquetas (Apagado)
   mut2: "var(--mut2)",           // texto terciario / placeholders
-  line: "var(--line)",           // bordes finos (hairline)
+  line: "var(--line)",           // bordes finos (Línea)
   lineStrong: "var(--line-strong)", // bordes con más presencia (hover, foco)
-  paper: "var(--paper)",         // fondo general de la página
+  paper: "var(--paper)",         // fondo general de la página (Superficie)
   body: "var(--body)",           // fondo del shell / sidebar
-  surface: "var(--surface)",     // tarjetas y superficies elevadas
+  surface: "var(--surface)",     // tarjetas y superficies elevadas (Papel)
 
-  // Marca (único acento de color, usado con moderación)
+  // CAD Navy: el ancla institucional de la marca (logo, títulos de marca)
+  navy: "var(--navy)",
+  navySoft: "var(--navy-soft)",
+
+  // Verde agro: secundario — positivo, aprobado, activo
   green: "var(--green)",
   greenDk: "var(--green-dk)",
   greenSoft: "var(--green-soft)",
 
-  // Acento secundario (dorado de marca, uso puntual)
+  // Naranja energía: acento/CTA — botones y llamadas a la acción principales
   gold: "var(--gold)",
   goldSoft: "var(--gold-soft)",
 
@@ -42,11 +47,14 @@ export const C = {
 };
 
 export const FONTS = {
-  // Un único stack sans-serif (Inter) para toda la app: títulos, cifras y texto.
-  // Se conserva el nombre SERIF por compatibilidad con las vistas existentes,
-  // pero ahora apunta al mismo stack sans para lograr el look tipo fintech.
-  SANS: "'Inter','Inter var',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif",
-  SERIF: "'Inter','Inter var',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif",
+  // Poppins es la tipografía operativa oficial del Manual de Marca CAD —
+  // se usa para todo: títulos, cifras y texto de cuerpo.
+  SANS: "'Poppins',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif",
+  SERIF: "'Poppins',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif",
+  // Bebas Neue: SOLO para momentos puntuales de gran escala (portadas,
+  // pantallas de login) — el manual prohíbe usarla en cuerpo de texto,
+  // tablas o leyendas.
+  DISPLAY: "'Bebas Neue',system-ui,sans-serif",
 };
 
 export const UI = {

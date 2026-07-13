@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "./services/auth";
-import { LOGO } from "./logo.jsx";
+import { LOGO, LOGO_MAIZALITO } from "./logo.jsx";
 import { C, FONTS, UI } from "./constants/theme";
 import { ChecklistPassword } from "./components/ChecklistPassword.jsx";
 import { passwordEsValida } from "./utils/validarPassword.js";
@@ -73,7 +73,8 @@ export default function Login() {
       <div style={{ width: "100%", maxWidth: 384 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 26 }}>
           <img src={LOGO} alt="CAD Venezuela" style={{ height: 56, display: "block" }} />
-          <div style={{ fontSize: 12.5, color: C.mut, textAlign: "center" }}>Tesorería &amp; Proyección de Pagos · El Maizalito</div>
+          <div style={{ fontSize: 12, color: C.mut, textAlign: "center" }}>Tesorería &amp; Proyección de Pagos</div>
+          <img src={LOGO_MAIZALITO} alt="El Maizalito" style={{ height: 22, display: "block", marginTop: 2 }} />
         </div>
 
         <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: UI.RADIUS + 2, padding: 26, boxShadow: UI.SHADOW }}>
@@ -106,7 +107,7 @@ export default function Login() {
             </div>
           )}
 
-          <button onClick={enviar} disabled={busy} style={{ width: "100%", padding: "11px", background: C.ink, color: "#fff", border: "none", borderRadius: UI.RADIUS_SM, fontSize: 14, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, fontFamily: FONTS.SANS }}>
+          <button onClick={enviar} disabled={busy} style={{ width: "100%", padding: "11px", background: C.gold, color: "#fff", border: "none", borderRadius: UI.RADIUS_SM, fontSize: 14, fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1, fontFamily: FONTS.SANS }}>
             {busy ? "Un momento…" : modo === "in" ? "Entrar" : modo === "up" ? "Registrarme" : "Enviar link de recuperación"}
           </button>
 

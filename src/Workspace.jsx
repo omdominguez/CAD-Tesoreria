@@ -7,7 +7,8 @@ import {
   Settings, 
   LogOut, 
   Menu, 
-  X
+  X,
+  FileBarChart
 } from "lucide-react";
 
 // Contexto de Autenticación
@@ -32,6 +33,7 @@ import Directorio from "./views/Directorio/Directorio";
 import Compromisos from "./views/Compras/Compromisos";
 import ModuloTesoreria from "./views/Tesoreria/ModuloTesoreria";
 import ModuloAjustes from "./views/Ajustes/ModuloAjustes";
+import ReporteMensual from "./views/Reportes/ReporteMensual";
 
 export default function Workspace({ st, act }) {
   const { user, role, signOut } = useAuth();
@@ -67,7 +69,7 @@ export default function Workspace({ st, act }) {
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "18px 16px", borderBottom: `1px solid ${C.line}`, marginBottom: 16 }}>
             <img src={LOGO_MARK} alt="" style={{ height: 32, width: "auto", display: "block", flexShrink: 0 }} />
             <div>
-              <div style={{ fontFamily: FONTS.SANS, fontSize: 16, fontWeight: 800, color: C.ink, letterSpacing: -0.3, lineHeight: 1.15 }}>
+              <div style={{ fontFamily: FONTS.SANS, fontSize: 16, fontWeight: 800, color: C.navy, letterSpacing: -0.3, lineHeight: 1.15 }}>
                 EL MAIZALITO
               </div>
               <div style={{ fontSize: 10, color: C.mut, fontWeight: 700, marginTop: 1, letterSpacing: 0.5, textTransform: "uppercase" }}>
@@ -97,6 +99,13 @@ export default function Workspace({ st, act }) {
             {(role === "TESORERIA" || role === "MASTER") && (
               <SidebarItem act={modulo === "tesoreria"} onClick={() => ir("tesoreria")}>
                 <Wallet size={16} /> Módulo Tesorería
+              </SidebarItem>
+            )}
+
+            {/* Reportes: Accesible por Tesorería y Gerencia (Master) */}
+            {(role === "TESORERIA" || role === "MASTER") && (
+              <SidebarItem act={modulo === "reportes"} onClick={() => ir("reportes")}>
+                <FileBarChart size={16} /> Reportes
               </SidebarItem>
             )}
 
@@ -182,6 +191,9 @@ export default function Workspace({ st, act }) {
           )}
           {modulo === "tesoreria" && (role === "TESORERIA" || role === "MASTER") && (
             <ModuloTesoreria st={st} act={act} rol={role} usuario={user?.email} />
+          )}
+          {modulo === "reportes" && (role === "TESORERIA" || role === "MASTER") && (
+            <ReporteMensual st={st} />
           )}
           {modulo === "ajustes" && (
             <ModuloAjustes st={st} act={act} rol={role} meId={user?.id} />

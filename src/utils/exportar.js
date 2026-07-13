@@ -5,6 +5,8 @@
    en el navegador (sin backend) y descargadas directo al equipo.
    ============================================================ */
 
+import { LOGO_CAD_VENEZUELA } from "../logo.jsx";
+
 function escaparCeldaCSV(valor) {
   const s = valor === null || valor === undefined ? "" : String(valor);
   if (/[",\n;]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
@@ -96,14 +98,16 @@ export async function exportarCorridaPDF(corrida, items, opciones = {}) {
   const GRIS = [120, 120, 120];
   let y = 18;
 
-  doc.setFontSize(18);
-  doc.setTextColor(...NAVY);
-  doc.text("El Maizalito · CAD Venezuela", 14, y);
-  y += 6;
+  // Logo real de CAD a color (proporción 2572x1135 del recurso oficial)
+  const LOGO_ANCHO = 34;
+  const LOGO_ALTO = LOGO_ANCHO / (2572 / 1135);
+  doc.addImage(LOGO_CAD_VENEZUELA, "PNG", 14, y - 8, LOGO_ANCHO, LOGO_ALTO);
+  y += LOGO_ALTO + 4;
+
   doc.setFontSize(9);
   doc.setTextColor(...GRIS);
   doc.text("Comercializadora Agrícola Domínguez, C.A. · RIF J-30386970-0", 14, y);
-  y += 12;
+  y += 10;
 
   doc.setDrawColor(...NAVY);
   doc.setLineWidth(0.6);
@@ -171,14 +175,16 @@ export async function exportarReporteMensualPDF(reporte) {
   const fmt = (n) => "$ " + Number(n || 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   let y = 18;
 
-  doc.setFontSize(18);
-  doc.setTextColor(...NAVY);
-  doc.text("El Maizalito · CAD Venezuela", 14, y);
-  y += 6;
+  // Logo real de CAD a color (proporción 2572x1135 del recurso oficial)
+  const LOGO_ANCHO = 34;
+  const LOGO_ALTO = LOGO_ANCHO / (2572 / 1135);
+  doc.addImage(LOGO_CAD_VENEZUELA, "PNG", 14, y - 8, LOGO_ANCHO, LOGO_ALTO);
+  y += LOGO_ALTO + 4;
+
   doc.setFontSize(9);
   doc.setTextColor(...GRIS);
   doc.text("Comercializadora Agrícola Domínguez, C.A. · RIF J-30386970-0", 14, y);
-  y += 12;
+  y += 10;
 
   doc.setDrawColor(...NAVY);
   doc.setLineWidth(0.6);

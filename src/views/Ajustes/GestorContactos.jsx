@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Trash2, Pencil, Users, X } from "lucide-react";
+import { Plus, Trash2, Pencil, Users, X, Globe2, MapPin } from "lucide-react";
 
 // Tema y Utilidades
 import { C } from "../../constants/theme";
@@ -8,9 +8,20 @@ import { esProv, esCli, bancosProv } from "../../utils/finance";
 // Componentes UI
 import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
 import { Btn, Segmented } from "../../components/ui/Buttons";
-import { Field, Input } from "../../components/ui/Forms";
+import { Field, Input, Select } from "../../components/ui/Forms";
 import { Th, Td } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Data";
+
+const CUENTA_VACIA = () => ({
+  id: crypto.randomUUID(),
+  banco: "",
+  cuenta: "",
+  moneda: "USD",
+  tipo: "NACIONAL",
+  pais: "Venezuela",
+  swift: "",
+  routing: ""
+});
 
 export default function GestorContactos({ st, act }) {
   // modalData: null = cerrado, { type: 'new' | 'edit', data: obj }
@@ -66,32 +77,49 @@ export default function GestorContactos({ st, act }) {
                   <Th>RIF</Th>
                   <Th>Razón social</Th>
                   <Th>Perfil</Th>
+                  <Th>Cuentas bancarias</Th>
                   <Th right>Acciones</Th>
                 </tr>
               </thead>
               <tbody>
-                {lista.map((p) => (
-                  <tr key={p.id}>
-                    <Td>{p.rif}</Td>
-                    <Td bold>{p.razonSocial}</Td>
-                    <Td>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        {esProv(p) && <Badge tone="gold">Prov</Badge>}
-                        {esCli(p) && <Badge tone="verde">Cli</Badge>}
-                      </div>
-                    </Td>
-                    <Td right>
-                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                        <Btn small variant="ghost" onClick={() => setModalData({ type: "edit", data: p })}>
-                          <Pencil size={13} />
-                        </Btn>
-                        <Btn small variant="danger" onClick={() => act.delProv(p.id)}>
-                          <Trash2 size={13} />
-                        </Btn>
-                      </div>
-                    </Td>
-                  </tr>
-                ))}
+                {lista.map((p) => {
+                  const cuentas = bancosProv(p);
+                  return (
+                    <tr key={p.id}>
+                      <Td>{p.rif}</Td>
+                      <Td bold>{p.razonSocial}</Td>
+                      <Td>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {esProv(p) && <Badge tone="gold">Prov</Badge>}
+                          {esCli(p) && <Badge tone="verde">Cli</Badge>}
+                        </div>
+                      </Td>
+                      <Td>
+                        {cuentas.length === 0 ? (
+                          <span style={{ fontSize: 12, color: C.mut }}>—</span>
+                        ) : (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {cuentas.map((c, i) => (
+                              <Badge key={i} tone={c.tipo === "INTERNACIONAL" ? "azul" : "mut"}>
+                                {c.tipo === "INTERNACIONAL" ? <Globe2 size={10} /> : <MapPin size={10} />} {c.banco || "Sin nombre"}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </Td>
+                      <Td right>
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          <Btn small variant="ghost" onClick={() => setModalData({ type: "edit", data: p })}>
+                            <Pencil size={13} />
+                          </Btn>
+                          <Btn small variant="danger" onClick={() => act.delProv(p.id)}>
+                            <Trash2 size={13} />
+                          </Btn>
+                        </div>
+                      </Td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -120,10 +148,12 @@ function ContactoModal({ initialData, onClose, onSave }) {
   // Construye el estado inicial basado en si estamos editando o creando
   const getInitialState = () => {
     if (initialData) {
-      const cuentasExisten = bancosProv(initialData);
+      // A las cuentas viejas que no tengan id/tipo/moneda (de antes de este
+      // cambio) les completamos los campos que falten, sin perder sus datos.
+      const cuentasExisten = bancosProv(initialData).map((b) => ({ ...CUENTA_VACIA(), ...b }));
       return { 
         ...initialData, 
-        bancos: cuentasExisten.length ? cuentasExisten : [{ banco: "", cuenta: "" }], 
+        bancos: cuentasExisten.length ? cuentasExisten : [CUENTA_VACIA()], 
         esProveedor: esProv(initialData), 
         esCliente: esCli(initialData) 
       };
@@ -131,7 +161,7 @@ function ContactoModal({ initialData, onClose, onSave }) {
     return { 
       rif: "", 
       razonSocial: "", 
-      bancos: [{ banco: "", cuenta: "" }], 
+      bancos: [CUENTA_VACIA()], 
       esProveedor: true, 
       esCliente: false 
     };
@@ -148,7 +178,7 @@ function ContactoModal({ initialData, onClose, onSave }) {
   
   const addBco = () => setF((prev) => ({ 
     ...prev, 
-    bancos: [...(prev.bancos || []), { banco: "", cuenta: "" }] 
+    bancos: [...(prev.bancos || []), CUENTA_VACIA()] 
   }));
   
   const delBco = (i) => setF((prev) => ({ 
@@ -159,7 +189,7 @@ function ContactoModal({ initialData, onClose, onSave }) {
   const guardar = () => {
     if (!f.rif || !f.razonSocial || (!f.esProveedor && !f.esCliente)) return;
     
-    // Limpiamos los bancos vacíos antes de guardar
+    // Limpiamos las cuentas vacías antes de guardar (las que no tienen ni banco ni cuenta)
     const dataClean = { 
       rif: f.rif, 
       razonSocial: f.razonSocial, 
@@ -172,7 +202,7 @@ function ContactoModal({ initialData, onClose, onSave }) {
   };
 
   return (
-    <Modal title={initialData ? "Editar contacto" : "Agregar contacto"} onClose={onClose}>
+    <Modal title={initialData ? "Editar contacto" : "Agregar contacto"} wide onClose={onClose}>
       <div style={{ display: "flex", gap: 16, marginBottom: 16, background: C.paper, padding: 12, borderRadius: 10, border: `1px solid ${C.line}` }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13.5 }}>
           <input 
@@ -193,51 +223,101 @@ function ContactoModal({ initialData, onClose, onSave }) {
         </label>
       </div>
       
-      <Field label="RIF">
-        <Input 
-          value={f.rif} 
-          onChange={(e) => setF({ ...f, rif: e.target.value })} 
-          placeholder="J-XXXXXXXX-X" 
-        />
-      </Field>
-      
-      <Field label="Razón social">
-        <Input 
-          value={f.razonSocial} 
-          onChange={(e) => setF({ ...f, razonSocial: e.target.value })} 
-        />
-      </Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12 }}>
+        <Field label="RIF">
+          <Input 
+            value={f.rif} 
+            onChange={(e) => setF({ ...f, rif: e.target.value })} 
+            placeholder="J-XXXXXXXX-X" 
+          />
+        </Field>
+        
+        <Field label="Razón social">
+          <Input 
+            value={f.razonSocial} 
+            onChange={(e) => setF({ ...f, razonSocial: e.target.value })} 
+          />
+        </Field>
+      </div>
       
       {/* Cuentas bancarias dinámicas (Solo si es proveedor) */}
       {f.esProveedor && (
         <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: C.mut, marginBottom: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.mut, marginBottom: 8 }}>
             Cuentas bancarias del proveedor
           </div>
           
-          {(f.bancos || []).map((b, i) => (
-            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-              <Input 
-                value={b.banco} 
-                onChange={(e) => setBco(i, "banco", e.target.value)} 
-                placeholder="Banco" 
-                style={{ marginBottom: 0 }} 
-              />
-              <Input 
-                value={b.cuenta} 
-                onChange={(e) => setBco(i, "cuenta", e.target.value)} 
-                placeholder="N° de cuenta" 
-                style={{ marginBottom: 0 }} 
-              />
-              <Btn small variant="danger" onClick={() => delBco(i)}>
-                <X size={13} />
-              </Btn>
-            </div>
-          ))}
+          <div style={{ display: "grid", gap: 10 }}>
+            {(f.bancos || []).map((b, i) => (
+              <div key={b.id || i} style={{ border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, background: C.paper }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <Segmented
+                    value={b.tipo}
+                    onChange={(v) => setBco(i, "tipo", v)}
+                    options={[
+                      { id: "NACIONAL", label: "Nacional" },
+                      { id: "INTERNACIONAL", label: "Internacional" }
+                    ]}
+                  />
+                  <Btn small variant="danger" onClick={() => delBco(i)}>
+                    <X size={13} />
+                  </Btn>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginBottom: 8 }}>
+                  <Input 
+                    value={b.banco} 
+                    onChange={(e) => setBco(i, "banco", e.target.value)} 
+                    placeholder="Nombre del banco" 
+                    style={{ marginBottom: 0 }} 
+                  />
+                  <Select value={b.moneda} onChange={(e) => setBco(i, "moneda", e.target.value)} style={{ marginBottom: 0 }}>
+                    <option value="USD">USD</option>
+                    <option value="BS">Bs</option>
+                    <option value="EUR">EUR</option>
+                  </Select>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: b.tipo === "INTERNACIONAL" ? "1fr 1fr" : "1fr", gap: 8, marginBottom: b.tipo === "INTERNACIONAL" ? 8 : 0 }}>
+                  <Input 
+                    value={b.cuenta} 
+                    onChange={(e) => setBco(i, "cuenta", e.target.value)} 
+                    placeholder="N° de cuenta / IBAN" 
+                    style={{ marginBottom: 0 }} 
+                  />
+                  {b.tipo === "INTERNACIONAL" && (
+                    <Input 
+                      value={b.pais} 
+                      onChange={(e) => setBco(i, "pais", e.target.value)} 
+                      placeholder="País del banco (ej. Estados Unidos)" 
+                      style={{ marginBottom: 0 }} 
+                    />
+                  )}
+                </div>
+
+                {b.tipo === "INTERNACIONAL" && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <Input 
+                      value={b.swift} 
+                      onChange={(e) => setBco(i, "swift", e.target.value)} 
+                      placeholder="Código SWIFT / BIC" 
+                      style={{ marginBottom: 0 }} 
+                    />
+                    <Input 
+                      value={b.routing} 
+                      onChange={(e) => setBco(i, "routing", e.target.value)} 
+                      placeholder="Routing number (ABA)" 
+                      style={{ marginBottom: 0 }} 
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
           
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginTop: 10, marginBottom: 14 }}>
             <Btn small variant="ghost" onClick={addBco}>
-              <Plus size={13} /> Agregar banco
+              <Plus size={13} /> Agregar cuenta bancaria
             </Btn>
           </div>
         </div>

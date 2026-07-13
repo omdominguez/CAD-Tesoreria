@@ -44,7 +44,7 @@ import { Section, Card, Empty } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
 import { Badge } from "../../components/ui/Data";
 import VariacionMensualBCV from "./VariacionMensualBCV";
-import { logoUrlDeBanco, logoRespaldoDeBanco } from "../../utils/bancoLogos";
+import { logosDeBanco } from "../../utils/bancoLogos";
 
 /* ============================================================
    Franja de KPIs: una sola tarjeta dividida por líneas finas,
@@ -87,20 +87,23 @@ function KpiStrip({ items }) {
 }
 
 /** Avatar circular del banco: Clearbit → favicon de Google → iniciales. */
+/** Avatar circular del banco: recorre la cadena completa de fuentes de logo → iniciales. */
 function AvatarBanco({ nombre }) {
-  const [etapa, setEtapa] = useState("clearbit"); // 'clearbit' | 'favicon' | 'iniciales'
+  const candidatos = logosDeBanco(nombre);
+  const [indice, setIndice] = useState(0);
   const iniciales = (nombre || "??").trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 
-  const logoUrl = etapa === "clearbit" ? logoUrlDeBanco(nombre) : etapa === "favicon" ? logoRespaldoDeBanco(nombre) : null;
+  const logoUrl = indice < candidatos.length ? candidatos[indice] : null;
 
   if (logoUrl) {
     return (
       <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fff", border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
         <img
+          key={logoUrl}
           src={logoUrl}
           alt=""
-          onError={() => setEtapa((e) => (e === "clearbit" ? "favicon" : "iniciales"))}
-          style={{ width: "100%", height: "100%", objectFit: "contain", padding: etapa === "clearbit" ? 4 : 8 }}
+          onError={() => setIndice((i) => i + 1)}
+          style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }}
         />
       </div>
     );

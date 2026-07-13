@@ -210,11 +210,11 @@ function InnerApp() {
     },
 
     // === TESORERÍA: PAGOS A PROVEEDORES ===
-    asignar: (id, bancoAsignadoId, prioridad) => {
+    asignar: (id, bancoAsignadoId, prioridad, cuentaDestinoId) => {
       setSt((prev) => {
         const next = {
           ...prev,
-          compromisos: (prev.compromisos || []).map((c) => (c.id === id ? { ...c, bancoAsignadoId, prioridad } : c))
+          compromisos: (prev.compromisos || []).map((c) => (c.id === id ? { ...c, bancoAsignadoId, prioridad, cuentaDestinoId } : c))
         };
         saveState(next, user.id).catch(console.error);
         return next;

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { CreditCard, Building2, Banknote, Lock } from "lucide-react";
+import { CreditCard, Building2, Banknote, Lock, Globe2, MapPin } from "lucide-react";
 
 // Tema y utilidades
-import { C } from "../../constants/theme";
+import { C, TIPOS_MOV } from "../../constants/theme";
 import { 
   estadoDe, 
   provNom, 
@@ -11,7 +11,9 @@ import {
   money, 
   pendienteDe,
   tasaSegunFormaPago,
-  TIPOS_MOV 
+  bancosProv,
+  cuentaProvPorId,
+  resumenCuenta
 } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
 
@@ -50,7 +52,7 @@ export default function CuentasPorPagar({ st, act, rol }) {
   const pg = usePaged(lista, 10);
 
   const abrirAsignacion = (c) => {
-    setF({ compromisoId: c.id, bancoAsignadoId: c.bancoAsignadoId || "", prioridad: c.prioridad || "NORMAL" });
+    setF({ compromisoId: c.id, proveedorId: c.proveedorId, bancoAsignadoId: c.bancoAsignadoId || "", cuentaDestinoId: c.cuentaDestinoId || "", prioridad: c.prioridad || "NORMAL" });
     setModal("asig");
   };
 
@@ -60,6 +62,8 @@ export default function CuentasPorPagar({ st, act, rol }) {
     const tasaAplicable = tasaSegunFormaPago(st, formaPago); // null si es USD directo
     const esEnBs = tasaAplicable !== null;
     const etiquetaTasa = { BS_BCV: "BCV ($)", BS_PARALELO: "Paralelo", BS_BCV_EUR: "BCV (€)", BS: "BCV ($)" }[formaPago] || "";
+    const proveedor = (st.proveedores || []).find((p) => p.id === c.proveedorId);
+    const cuentaDestino = c.cuentaDestinoId ? cuentaProvPorId(proveedor, c.cuentaDestinoId) : null;
 
     setF({ 
       compromisoId: c.id, 
@@ -68,6 +72,8 @@ export default function CuentasPorPagar({ st, act, rol }) {
       moneda: esEnBs ? "BS" : "USD", 
       tasaBcvPago: esEnBs ? tasaAplicable : null,
       etiquetaTasa,
+      cuentaDestino,
+      proveedorNombre: proveedor?.razonSocial,
       bancoOrigenId: c.bancoAsignadoId || (st.bancos || []).find((b) => b.moneda === (esEnBs ? "BS" : "USD"))?.id || "", 
       referencia: "", 
       adjuntos: [] 
@@ -104,7 +110,8 @@ export default function CuentasPorPagar({ st, act, rol }) {
                   <Th>Proveedor / concepto</Th>
                   <Th>Vence</Th>
                   <Th right>Pendiente</Th>
-                  <Th>Banco pagador</Th>
+                  <Th>Cuenta destino (proveedor)</Th>
+                  <Th>Banco pagador (CAD)</Th>
                   <Th>Estado</Th>
                   <Th right>Acciones</Th>
                 </tr>
@@ -114,6 +121,8 @@ export default function CuentasPorPagar({ st, act, rol }) {
                   const e = estadoDe(st, c); 
                   const tone = e === "PAGADO" ? "verde" : e === "PARCIAL" ? "amar" : "gold";
                   const isEnCorrida = bloqueado(c);
+                  const proveedor = (st.proveedores || []).find((p) => p.id === c.proveedorId);
+                  const cuentaDestino = c.cuentaDestinoId ? cuentaProvPorId(proveedor, c.cuentaDestinoId) : null;
                   
                   return (
                     <tr key={c.id}>
@@ -126,6 +135,16 @@ export default function CuentasPorPagar({ st, act, rol }) {
                       <Td>{fmtD(c.fechaVencimiento)}</Td>
                       <Td right bold>{money(pendienteDe(st, c), c.moneda)}</Td>
                       <Td>
+                        {cuentaDestino ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+                            {cuentaDestino.tipo === "INTERNACIONAL" ? <Globe2 size={12} color={C.azul} /> : <MapPin size={12} color={C.mut} />}
+                            {resumenCuenta(cuentaDestino)}
+                          </div>
+                        ) : (
+                          <Badge tone="rojo">Sin asignar</Badge>
+                        )}
+                      </Td>
+                      <Td>
                         {c.bancoAsignadoId ? (
                           <span style={{ fontSize: 12.5 }}>{bancoNom(st, c.bancoAsignadoId)}</span>
                         ) : (
@@ -137,7 +156,7 @@ export default function CuentasPorPagar({ st, act, rol }) {
                         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                           {puedeTeso && e !== "PAGADO" && !isEnCorrida && (
                             <>
-                              <Btn small variant="ghost" title="Asignar banco" onClick={() => abrirAsignacion(c)}>
+                              <Btn small variant="ghost" title="Asignar banco y cuenta destino" onClick={() => abrirAsignacion(c)}>
                                 <Building2 size={13} /> Banco
                               </Btn>
                               <Btn small variant="soft" title="Registrar pago" onClick={() => abrirPago(c)}>
@@ -167,7 +186,7 @@ export default function CuentasPorPagar({ st, act, rol }) {
           initialData={f} 
           onClose={() => setModal(null)} 
           onSave={(data) => {
-            act.asignar(data.compromisoId, data.bancoAsignadoId, data.prioridad);
+            act.asignar(data.compromisoId, data.bancoAsignadoId, data.prioridad, data.cuentaDestinoId);
             setModal(null);
           }} 
         />
@@ -193,10 +212,33 @@ export default function CuentasPorPagar({ st, act, rol }) {
    ============================================================ */
 function AsignarBancoModal({ st, initialData, onClose, onSave }) {
   const [f, setF] = useState({ ...initialData });
+  const proveedor = (st.proveedores || []).find((p) => p.id === f.proveedorId);
+  const cuentasProveedor = bancosProv(proveedor);
 
   return (
-    <Modal title="Asignar banco pagador" onClose={onClose}>
-      <Field label="Banco con el que se pagará este compromiso">
+    <Modal title="Asignar banco y cuenta destino" onClose={onClose}>
+      <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 14 }}>
+        Proveedor: <b style={{ color: C.ink }}>{proveedor?.razonSocial || "—"}</b>
+      </div>
+
+      <Field label="Cuenta del proveedor a la que se pagará (destino)">
+        <Select value={f.cuentaDestinoId} onChange={(e) => setF({ ...f, cuentaDestinoId: e.target.value })}>
+          <option value="">Sin asignar</option>
+          {cuentasProveedor.map((cta) => (
+            <option key={cta.id} value={cta.id}>
+              {cta.tipo === "INTERNACIONAL" ? "🌐 " : "🏠 "}
+              {cta.banco} — {cta.tipo === "INTERNACIONAL" ? `SWIFT ${cta.swift || "—"}` : cta.cuenta} ({cta.moneda})
+            </option>
+          ))}
+        </Select>
+        {cuentasProveedor.length === 0 && (
+          <div style={{ fontSize: 11.5, color: C.rojo, marginTop: 6 }}>
+            Este proveedor no tiene cuentas bancarias registradas — agrégalas en Ajustes → Contactos.
+          </div>
+        )}
+      </Field>
+
+      <Field label="Banco de CAD con el que se pagará (origen)">
         <Select value={f.bancoAsignadoId} onChange={(e) => setF({ ...f, bancoAsignadoId: e.target.value })}>
           <option value="">Sin asignar</option>
           {(st.bancos || []).map((b) => (
@@ -221,11 +263,37 @@ function PagarProveedorModal({ st, initialData, onClose, onSave }) {
   const guardar = () => {
     if (!(Number(f.monto) > 0)) return;
     if (f.tipo !== "CRUCE" && !f.referencia.trim()) return;
-    onSave(f);
+    // cuentaDestino/proveedorNombre son solo para mostrar en pantalla — no se guardan en el movimiento
+    const { cuentaDestino, proveedorNombre, ...datosLimpios } = f;
+    onSave(datosLimpios);
   };
 
   return (
     <Modal title="Registrar pago a proveedor" onClose={onClose}>
+      {f.proveedorNombre && (
+        <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 10 }}>
+          Pagando a: <b style={{ color: C.ink }}>{f.proveedorNombre}</b>
+        </div>
+      )}
+
+      {f.cuentaDestino ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.body, padding: "9px 12px", borderRadius: 10, fontSize: 12.5, marginBottom: 14, border: `1px solid ${C.line}` }}>
+          {f.cuentaDestino.tipo === "INTERNACIONAL" ? <Globe2 size={15} color={C.azul} /> : <MapPin size={15} color={C.mut} />}
+          <div>
+            <div style={{ fontWeight: 700, color: C.ink }}>{f.cuentaDestino.banco}</div>
+            <div style={{ color: C.mut }}>
+              {f.cuentaDestino.tipo === "INTERNACIONAL"
+                ? `SWIFT ${f.cuentaDestino.swift || "—"}${f.cuentaDestino.routing ? " · Routing " + f.cuentaDestino.routing : ""} · ${f.cuentaDestino.pais || ""}`
+                : `Cuenta ${f.cuentaDestino.cuenta}`}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: C.amarSoft, color: C.amar, padding: "9px 12px", borderRadius: 10, fontSize: 12, marginBottom: 14 }}>
+          No hay una cuenta destino asignada para este pago — asígnala con el botón "Banco" antes de transferir, para no equivocarte de cuenta.
+        </div>
+      )}
+
       {f.tasaBcvPago && (
         <div style={{ background: C.greenSoft, color: C.greenDk, padding: "9px 12px", borderRadius: 10, fontSize: 12, marginBottom: 14 }}>
           Este pedido se paga en Bs — el monto se calculó con la tasa {f.etiquetaTasa || "vigente"} de hoy (<b>{money(f.tasaBcvPago, "BS").replace("Bs", "Bs.")}</b> por USD).

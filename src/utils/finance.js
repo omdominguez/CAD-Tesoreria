@@ -142,6 +142,21 @@ export const provNom = (st, id) => prov(st, id)?.razonSocial || "—";
 export const bancoNom = (st, id) => banco(st, id)?.nombre || "Sin asignar";
 
 export const bancosProv = (p) => Array.isArray(p?.bancos) ? p.bancos : (p?.bancoDestino ? [{ banco: p.bancoDestino, cuenta: p.cuentaDestino || "" }] : []);
+
+/** Busca una cuenta bancaria específica de un proveedor por su id. */
+export const cuentaProvPorId = (p, cuentaId) => bancosProv(p).find((b) => b.id === cuentaId) || null;
+
+/** Texto corto para mostrar una cuenta bancaria de proveedor (banco + últimos dígitos, o SWIFT si es internacional). */
+export function resumenCuenta(cta) {
+  if (!cta) return null;
+  const partes = [cta.banco || "Banco sin nombre"];
+  if (cta.tipo === "INTERNACIONAL") {
+    if (cta.swift) partes.push(`SWIFT ${cta.swift}`);
+  } else if (cta.cuenta) {
+    partes.push(cta.cuenta.length > 4 ? "•••" + cta.cuenta.slice(-4) : cta.cuenta);
+  }
+  return partes.join(" — ");
+}
 export const esProv = (c) => c.esProveedor !== false;
 export const esCli = (c) => c.esCliente === true;
 
@@ -363,11 +378,8 @@ export function ledgerCli(st, p) {
 
 /* ============================================================
    TIPOS DE MOVIMIENTOS
+   ------------------------------------------------------------
+   La lista real (con las etiquetas que se muestran en los <select>)
+   vive en constants/theme.js — este archivo ya no define su propia
+   versión para evitar que alguien importe la equivocada por error.
    ============================================================ */
-export const TIPOS_MOV = {
-  TRANSFERENCIA: { lbl: "Transferencia", tone: "good" },
-  EFECTIVO: { lbl: "Efectivo", tone: "warn" },
-  ZELLE: { lbl: "Zelle", tone: "info" },
-  PAGO_MOVIL: { lbl: "Pago Móvil", tone: "good" },
-  CRUCE: { lbl: "Cruce de Cuentas", tone: "mut" }
-};

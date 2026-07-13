@@ -1,15 +1,21 @@
 /* ============================================================
    LOGOS DE BANCOS
    ------------------------------------------------------------
-   Intenta el logo real de Clearbit primero; si esa falla (dejó de
-   ser gratuita para muchos dominios), cae al favicon del sitio vía
-   Google; si eso también falla, la tarjeta usa el avatar de
-   iniciales. Ninguna de las tres etapas requiere llave ni
-   configuración.
+   Cadena de varias fuentes, de la más confiable a la menos, hasta
+   dar con una que responda:
+     1. Unavatar — un servicio "agregador" pensado justo para esto,
+        prueba varias fuentes por su cuenta antes de devolver nada.
+     2. DuckDuckGo Icons — muy estable, sin necesidad de llave.
+     3. Favicon de Google — respaldo adicional.
+     4. Clearbit — se deja al final porque dejó de ser gratuita para
+        la mayoría de dominios tras su compra por HubSpot, pero a
+        veces todavía responde para algunos.
+   Si ninguna responde, la tarjeta cae al avatar de iniciales — eso
+   ya está resuelto en el componente que las usa (Tablero.jsx).
 
    IMPORTANTE: algunos dominios (sobre todo de filiales en Panamá,
    o bancos que no reconozco con certeza) son una mejor suposición,
-   no una verificación 100% confirmada. El encadenado de respaldos
+   no una verificación 100% confirmada. La cadena de varias fuentes
    existe justo para que un dominio equivocado nunca rompa nada.
    ============================================================ */
 
@@ -44,20 +50,26 @@ const REGLAS = [
   { test: (n) => n.includes("venezolano de credito"), dominio: "venezolano.com" },
 ];
 
-/** Logo principal sugerido (Clearbit) para un banco, o null si no lo reconoce. */
-export function logoUrlDeBanco(nombreBanco) {
+function dominioDeBanco(nombreBanco) {
   const n = normalizar(nombreBanco);
   const regla = REGLAS.find((r) => r.test(n));
-  return regla ? `https://logo.clearbit.com/${regla.dominio}?size=80` : null;
+  return regla ? regla.dominio : null;
 }
 
 /**
- * Respaldo si Clearbit no responde (dejó de ser gratuito para muchos
- * dominios tras su compra por HubSpot): el favicon del sitio vía Google,
- * más limitado visualmente pero muy confiable y sin necesidad de llave.
+ * Devuelve la cadena COMPLETA de URLs a intentar para el logo de un
+ * banco, de la más confiable a la menos — o un arreglo vacío si no
+ * se reconoce el banco. El componente que las use debe ir probando
+ * una por una (con onError) hasta que alguna cargue, y si ninguna
+ * lo hace, mostrar el avatar de iniciales.
  */
-export function logoRespaldoDeBanco(nombreBanco) {
-  const n = normalizar(nombreBanco);
-  const regla = REGLAS.find((r) => r.test(n));
-  return regla ? `https://www.google.com/s2/favicons?sz=128&domain=${regla.dominio}` : null;
+export function logosDeBanco(nombreBanco) {
+  const d = dominioDeBanco(nombreBanco);
+  if (!d) return [];
+  return [
+    `https://unavatar.io/${d}?fallback=false`,
+    `https://icons.duckduckgo.com/ip3/${d}.ico`,
+    `https://www.google.com/s2/favicons?sz=128&domain=${d}`,
+    `https://logo.clearbit.com/${d}?size=80`,
+  ];
 }

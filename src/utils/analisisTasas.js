@@ -56,6 +56,22 @@ export function filtrarPorAnio(serie, anio) {
   return !anio || anio === "todos" ? serie : serie.filter((r) => r.fecha.slice(0, 4) === anio);
 }
 
+/**
+ * Filtra la serie por un rango de fechas (inclusive). Cualquiera de los dos
+ * extremos puede venir vacío: solo 'desde' = de esa fecha en adelante; solo
+ * 'hasta' = hasta esa fecha; ambos vacíos = toda la serie. Las fechas van en
+ * formato 'YYYY-MM-DD' (comparación de texto, que es segura en ese formato).
+ */
+export function filtrarPorRango(serie, desde, hasta) {
+  return serie.filter((r) => (!desde || r.fecha >= desde) && (!hasta || r.fecha <= hasta));
+}
+
+/** Rango [min, max] de fechas presentes en la serie (o [null, null] si vacía). */
+export function rangoFechas(serie) {
+  if (!serie.length) return [null, null];
+  return [serie[0].fecha, serie[serie.length - 1].fecha];
+}
+
 /** ¿Esa tasa tiene al menos un dato > 0 en la serie? (para no graficar líneas vacías). */
 export function tasaTieneDatos(serie, key) {
   return serie.some((r) => r[key] > 0);

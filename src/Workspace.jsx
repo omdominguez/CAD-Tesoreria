@@ -34,7 +34,7 @@ import Directorio from "./views/Directorio/Directorio";
 import Compromisos from "./views/Compras/Compromisos";
 import ModuloTesoreria from "./views/Tesoreria/ModuloTesoreria";
 import ModuloAjustes from "./views/Ajustes/ModuloAjustes";
-import ReporteMensual from "./views/Reportes/ReporteMensual";
+import ModuloReportes from "./views/Reportes/ModuloReportes";
 import ModuloBanco from "./views/Banco/ModuloBanco";
 
 export default function Workspace({ st, act }) {
@@ -202,7 +202,7 @@ export default function Workspace({ st, act }) {
             <ModuloTesoreria st={st} act={act} rol={role} usuario={user?.email} />
           )}
           {modulo === "reportes" && (role === "TESORERIA" || role === "MASTER") && (
-            <ReporteMensual st={st} />
+            <ModuloReportes st={st} />
           )}
           {modulo === "banco" && (role === "TESORERIA" || role === "MASTER") && (
             <ModuloBanco st={st} act={act} rol={role} usuario={user?.email} />

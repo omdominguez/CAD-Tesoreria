@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   Wallet,
@@ -9,7 +9,9 @@ import {
   Sparkles,
   ShieldCheck,
   AlertTriangle,
-  Landmark
+  Landmark,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import {
   ComposedChart,
@@ -43,8 +45,9 @@ import {
 import { Section, Card, Empty } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
 import { Badge } from "../../components/ui/Data";
-import VariacionMensualBCV from "./VariacionMensualBCV";
+import ComportamientoTasas from "./ComportamientoTasas";
 import { AvatarBanco } from "../../components/shared/AvatarBanco";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 /* ============================================================
    Franja de KPIs: una sola tarjeta dividida por líneas finas,
@@ -141,6 +144,103 @@ function TarjetaBanco({ b, st }) {
     </Card>
   );
 }
+
+/* ============================================================
+   Carrusel de bancos: muestra un par de bancos a la vez, se
+   desliza solo cada pocos segundos (se pausa al pasar el mouse)
+   y permite avanzar/retroceder a mano con flechas o puntos para
+   ubicar la disponibilidad de un banco puntual.
+   ============================================================ */
+function CarruselBancos({ bancos, st }) {
+  const isMobile = useIsMobile();
+  const porPagina = isMobile ? 1 : 2;
+  const [pagina, setPagina] = useState(0);
+  const [pausado, setPausado] = useState(false);
+
+  const paginas = useMemo(() => {
+    const grupos = [];
+    for (let i = 0; i < bancos.length; i += porPagina) grupos.push(bancos.slice(i, i + porPagina));
+    return grupos;
+  }, [bancos, porPagina]);
+
+  // Si cambia la cantidad de páginas (resize, más/menos bancos) y quedamos fuera de rango
+  useEffect(() => { if (pagina >= paginas.length) setPagina(0); }, [paginas.length, pagina]);
+
+  // Rotación automática (se reinicia en cada cambio, así al pasarlo a mano espera de nuevo)
+  useEffect(() => {
+    if (pausado || paginas.length <= 1) return;
+    const t = setTimeout(() => setPagina((p) => (p + 1) % paginas.length), 5000);
+    return () => clearTimeout(t);
+  }, [pagina, pausado, paginas.length]);
+
+  const ir = (i) => setPagina(((i % paginas.length) + paginas.length) % paginas.length);
+  const hayControles = paginas.length > 1;
+
+  return (
+    <div>
+      <div
+        onMouseEnter={() => setPausado(true)}
+        onMouseLeave={() => setPausado(false)}
+        style={{ overflow: "hidden" }}
+      >
+        <div style={{ display: "flex", transition: "transform 0.5s ease", transform: `translateX(-${pagina * 100}%)` }}>
+          {paginas.map((grupo, i) => (
+            <div key={i} style={{ flex: "0 0 100%", minWidth: "100%" }}>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${porPagina}, 1fr)`, gap: 14, alignItems: "start", paddingBottom: 2 }}>
+                {grupo.map((b) => <TarjetaBanco key={b.id} b={b} st={st} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {hayControles && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 14 }}>
+          <button onClick={() => ir(pagina - 1)} aria-label="Anterior" style={flechaEstilo}>
+            <ChevronLeft size={16} />
+          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {paginas.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setPagina(i)}
+                aria-label={`Ir al grupo ${i + 1}`}
+                style={{
+                  width: i === pagina ? 20 : 8,
+                  height: 8,
+                  borderRadius: 999,
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
+                  background: i === pagina ? C.verde : C.line,
+                  transition: "width 0.25s ease, background 0.25s ease"
+                }}
+              />
+            ))}
+          </div>
+
+          <button onClick={() => ir(pagina + 1)} aria-label="Siguiente" style={flechaEstilo}>
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const flechaEstilo = {
+  width: 32,
+  height: 32,
+  borderRadius: 999,
+  border: `1px solid ${C.line}`,
+  background: C.surface,
+  color: C.mut,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer"
+};
 
 export default function Tablero({ st }) {
   const [semanas, setSemanas] = useState(12);
@@ -314,14 +414,12 @@ export default function Tablero({ st }) {
             Disponible neto = saldo real − comprometido. Las cuentas en Bs muestran su equivalente en USD a cada tasa.
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
-            {(st.bancos || []).map((b) => <TarjetaBanco key={b.id} b={b} st={st} />)}
-          </div>
+          <CarruselBancos bancos={st.bancos || []} st={st} />
         </Card>
       )}
 
-      {/* 4. Variación mensual de la tasa BCV (historial externo) */}
-      <VariacionMensualBCV st={st} />
+      {/* 4. Comportamiento de las tasas de cambio (panel interactivo) */}
+      <ComportamientoTasas st={st} />
     </Section>
   );
 }

@@ -8,8 +8,8 @@ import { TrendingUp, LineChart as LineIcon, BarChart3, GitCompareArrows, Calenda
 import { C, FONTS } from "../../constants/theme";
 import { nf } from "../../utils/finance";
 import {
-  TASAS_META, etiquetaMes, nombreMesCorto,
-  serieHistorial, aniosDisponibles, filtrarPorAnio, tasaTieneDatos,
+  TASAS_META, etiquetaMes,
+  serieHistorial, aniosDisponibles, filtrarPorRango, rangoFechas, tasaTieneDatos,
   resumenMensual, tablaComportamiento, variacionAcumulada,
   serieBrecha, comparativoAnual
 } from "../../utils/analisisTasas";
@@ -17,7 +17,7 @@ import { exportarCSV, exportarExcel, exportarPDF } from "../../utils/exportar";
 
 import { Section, Card, Empty } from "../../components/ui/Layout";
 import { Segmented } from "../../components/ui/Buttons";
-import { Select } from "../../components/ui/Forms";
+import { Select, Input } from "../../components/ui/Forms";
 import { Th, Td } from "../../components/ui/Table";
 import { ExportMenu } from "../../components/ui/ExportMenu";
 
@@ -40,16 +40,44 @@ const tooltipStyle = {
   fontFamily: FONTS.SANS
 };
 
+function ChipPreset({ activo, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "5px 12px",
+        borderRadius: 999,
+        cursor: "pointer",
+        border: `1px solid ${activo ? C.navy : C.line}`,
+        background: activo ? C.navy : "transparent",
+        color: activo ? "#fff" : C.mut,
+        fontSize: 12,
+        fontWeight: 600,
+        fontFamily: FONTS.SANS
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function AnalisisTasas({ st }) {
   const serieCompleta = useMemo(() => serieHistorial(st.historialTasas || {}), [st.historialTasas]);
   const anios = useMemo(() => aniosDisponibles(serieCompleta), [serieCompleta]);
 
   const [tab, setTab] = useState("resumen");
-  const [anioFiltro, setAnioFiltro] = useState(() => anios[anios.length - 1] || "todos");
+  const [minFecha, maxFecha] = useMemo(() => rangoFechas(serieCompleta), [serieCompleta]);
+  // Por defecto arranca en el último año con datos (para que los KPIs y gráficos
+  // no salgan con todo el histórico de golpe); el botón "Todo" abre el rango completo.
+  const [desde, setDesde] = useState(() => (anios.length ? `${anios[anios.length - 1]}-01-01` : ""));
+  const [hasta, setHasta] = useState(() => (anios.length ? `${anios[anios.length - 1]}-12-31` : ""));
   const [tasaSel, setTasaSel] = useState("tasaBCV");
   const [modoAnual, setModoAnual] = useState("promedio");
 
-  const serie = useMemo(() => filtrarPorAnio(serieCompleta, anioFiltro), [serieCompleta, anioFiltro]);
+  const serie = useMemo(() => filtrarPorRango(serieCompleta, desde, hasta), [serieCompleta, desde, hasta]);
+
+  const periodoTexto = !desde && !hasta ? "histórico completo" : `${desde || minFecha} a ${hasta || maxFecha}`;
+  const periodoNombre = (!desde && !hasta ? "historico" : `${desde || minFecha}_${hasta || maxFecha}`).replace(/[^0-9a-zA-Z_-]/g, "");
 
   // Qué tasas graficar: las base + Intervención solo si alguien cargó datos de ella
   const tasasActivas = useMemo(() => {
@@ -108,23 +136,55 @@ export default function AnalisisTasas({ st }) {
         })}
       </div>
 
-      {/* Barra de control: pestañas + filtro de año (el comparativo anual usa todos los años) */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+      {/* Pestañas */}
+      <div style={{ marginBottom: 12 }}>
         <Segmented value={tab} onChange={setTab} options={tabs} />
-        {tab !== "anual" && anios.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 12, color: C.mut, fontWeight: 600 }}>Año</span>
-            <div style={{ minWidth: 130 }}>
-              <Select value={anioFiltro} onChange={(e) => setAnioFiltro(e.target.value)}>
-                <option value="todos">Todos</option>
-                {anios.map((a) => <option key={a} value={a}>{a}</option>)}
-              </Select>
-            </div>
-          </div>
-        )}
       </div>
 
-      {tab === "resumen" && <TabResumen serie={serie} keys={tasasActivas} anioFiltro={anioFiltro} />}
+      {/* Filtro de período (el comparativo anual usa todos los años, no se filtra) */}
+      {tab !== "anual" && (
+        <Card style={{ padding: 12, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: C.mut, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3 }}>Período</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Input
+                type="date"
+                value={desde}
+                min={minFecha || undefined}
+                max={hasta || maxFecha || undefined}
+                onChange={(e) => setDesde(e.target.value)}
+                style={{ marginBottom: 0, width: 150 }}
+              />
+              <span style={{ color: C.mut, fontSize: 12 }}>a</span>
+              <Input
+                type="date"
+                value={hasta}
+                min={desde || minFecha || undefined}
+                max={maxFecha || undefined}
+                onChange={(e) => setHasta(e.target.value)}
+                style={{ marginBottom: 0, width: 150 }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <ChipPreset activo={!desde && !hasta} onClick={() => { setDesde(""); setHasta(""); }}>Todo</ChipPreset>
+              {anios.map((a) => (
+                <ChipPreset
+                  key={a}
+                  activo={desde === `${a}-01-01` && hasta === `${a}-12-31`}
+                  onClick={() => { setDesde(`${a}-01-01`); setHasta(`${a}-12-31`); }}
+                >
+                  {a}
+                </ChipPreset>
+              ))}
+            </div>
+            <span style={{ marginLeft: "auto", fontSize: 12, color: C.mut }}>
+              <b style={{ color: C.ink }}>{serie.length}</b> día(s) en el período
+            </span>
+          </div>
+        </Card>
+      )}
+
+      {tab === "resumen" && <TabResumen serie={serie} keys={tasasActivas} periodoNombre={periodoNombre} periodoTexto={periodoTexto} />}
       {tab === "evolucion" && <TabEvolucion serie={serie} keys={tasasActivas} />}
       {tab === "variacion" && <TabVariacion serie={serie} tasaSel={tasaSel} setTasaSel={setTasaSel} keys={tasasActivas} />}
       {tab === "brecha" && <TabBrecha serie={serie} />}
@@ -146,7 +206,7 @@ export default function AnalisisTasas({ st }) {
 /* ============================================================
    PESTAÑA: RESUMEN MENSUAL (tabla de comportamiento + export)
    ============================================================ */
-function TabResumen({ serie, keys, anioFiltro }) {
+function TabResumen({ serie, keys, periodoNombre, periodoTexto }) {
   const tasasTabla = keys.filter((k) => k !== "tasaIntervencion"); // la tabla muestra las 3 con historial
   const tabla = useMemo(() => tablaComportamiento(serie, tasasTabla), [serie, tasasTabla]);
 
@@ -171,12 +231,12 @@ function TabResumen({ serie, keys, anioFiltro }) {
   });
 
   const exportar = async (formato) => {
-    const nombre = `analisis_tasas_${anioFiltro === "todos" ? "historico" : anioFiltro}`;
+    const nombre = `analisis_tasas_${periodoNombre}`;
     if (formato === "csv") return exportarCSV(nombre, columnasExport, filasExport());
     if (formato === "excel") return exportarExcel(nombre, columnasExport, filasExport(), "Comportamiento tasas");
     if (formato === "pdf") return exportarPDF(nombre, columnasExport, filasExport(), {
       titulo: "Análisis de Tasas de Cambio",
-      subtitulo: `Comportamiento mensual · ${anioFiltro === "todos" ? "histórico completo" : anioFiltro}`
+      subtitulo: `Comportamiento mensual · ${periodoTexto}`
     });
   };
 

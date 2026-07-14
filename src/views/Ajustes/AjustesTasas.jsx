@@ -11,7 +11,8 @@ import { useArrastrarArchivo } from "../../hooks/useArrastrarArchivo";
 import { Section, Card, Modal, Empty } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
 import { Field, Input } from "../../components/ui/Forms";
-import { Th, Td } from "../../components/ui/Table";
+import { Th, Td, Pagination } from "../../components/ui/Table";
+import { usePaged } from "../../hooks/usePaged";
 import { RefreshCw, History, Plus, Pencil, Trash2, CalendarClock, Upload } from "lucide-react";
 
 export default function AjustesTasas({ st, act }) {
@@ -24,6 +25,7 @@ export default function AjustesTasas({ st, act }) {
 
   // Definición de las tasas que queremos manejar y sus colores asociados
   const historialOrdenado = Object.entries(st.historialTasas || {}).sort((a, b) => b[0].localeCompare(a[0]));
+  const pgHistorial = usePaged(historialOrdenado, 15);
 
   const rates = [
     { k: "tasaBCV", lbl: "BCV (oficial, USD)", tone: C.green, auto: true },
@@ -193,7 +195,7 @@ export default function AjustesTasas({ st, act }) {
                 </tr>
               </thead>
               <tbody>
-                {historialOrdenado.map(([fecha, tasas]) => (
+                {pgHistorial.slice.map(([fecha, tasas]) => (
                   <tr key={fecha}>
                     <Td bold>{fecha}</Td>
                     <Td right>{nf.format(Number(tasas.tasaBCV) || 0)}</Td>
@@ -215,6 +217,7 @@ export default function AjustesTasas({ st, act }) {
               </tbody>
             </table>
           </div>
+          <Pagination pg={pgHistorial} opciones={[5, 10, 15, 20]} />
         </Card>
       )}
 

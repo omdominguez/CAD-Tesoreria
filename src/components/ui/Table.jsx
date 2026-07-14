@@ -56,7 +56,7 @@ const pgBtn = (dis) => ({
   padding: 0
 });
 
-export function Pagination({ pg }) {
+export function Pagination({ pg, opciones = [10, 20, 50] }) {
   if (pg.total === 0) return null;
   
   const from = (pg.page - 1) * pg.perPage + 1;
@@ -85,7 +85,7 @@ export function Pagination({ pg }) {
           }} 
           style={{ width: "auto", padding: "6px 8px", fontSize: 12.5 }}
         >
-          {[10, 20, 50].map((n) => (
+          {opciones.map((n) => (
             <option key={n} value={n}>{n} / pág.</option>
           ))}
         </Select>

@@ -46,6 +46,7 @@ import { Section, Card, Empty } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
 import { Badge } from "../../components/ui/Data";
 import ComportamientoTasas from "./ComportamientoTasas";
+import ProximosVencimientos from "./ProximosVencimientos";
 import { AvatarBanco } from "../../components/shared/AvatarBanco";
 import { useIsMobile } from "../../hooks/useIsMobile";
 
@@ -400,6 +401,9 @@ export default function Tablero({ st }) {
           <Sparkles size={14} color={C.gold} /> Simular escenario: excluir egresos marcados como flexibles
         </label>
       </Card>
+
+      {/* 2.5 Próximos vencimientos: pagos a proveedores y facturas por cobrar */}
+      <ProximosVencimientos st={st} />
 
       {/* 3. Saldos por banco: tarjetas en vez de tabla */}
       {(st.bancos || []).length > 0 && (

@@ -4,19 +4,23 @@ import React, { useState } from "react";
 import { C, FONTS } from "../../constants/theme";
 import { nf, hoyStr } from "../../utils/finance";
 import { fetchTasaBCV, fetchTasaParalelo, fetchSugerenciaIntervencion, fetchTasasBDV } from "../../utils/tasasExternas";
+import { extraerTextoPDF } from "../../utils/leerPdfTexto";
+import { useArrastrarArchivo } from "../../hooks/useArrastrarArchivo";
 
 // Componentes UI
 import { Section, Card, Modal, Empty } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
 import { Field, Input } from "../../components/ui/Forms";
 import { Th, Td } from "../../components/ui/Table";
-import { RefreshCw, History, Plus, Pencil, Trash2, CalendarClock } from "lucide-react";
+import { RefreshCw, History, Plus, Pencil, Trash2, CalendarClock, Upload } from "lucide-react";
 
 export default function AjustesTasas({ st, act }) {
   const [sincronizando, setSincronizando] = useState(false);
   const [resultado, setResultado] = useState(null); // texto del último intento manual
   const [sugerenciaInterv, setSugerenciaInterv] = useState(null); // promedio sugerido (no aplicado solo)
   const [modalHistorial, setModalHistorial] = useState(null); // null | "new" | fecha a editar
+  const [modalImportar, setModalImportar] = useState(false);
+  const [resultadoImport, setResultadoImport] = useState(null); // texto tras importar en lote
 
   // Definición de las tasas que queremos manejar y sus colores asociados
   const historialOrdenado = Object.entries(st.historialTasas || {}).sort((a, b) => b[0].localeCompare(a[0]));
@@ -150,9 +154,14 @@ export default function AjustesTasas({ st, act }) {
           <History size={16} color={C.mut} />
           <h3 style={{ fontFamily: FONTS.SANS, fontSize: 15, fontWeight: 800, color: C.ink, margin: 0 }}>Historial de tasas por día</h3>
         </div>
-        <Btn small onClick={() => setModalHistorial("new")}>
-          <Plus size={13} /> Agregar tasa de un día
-        </Btn>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn small variant="ghost" onClick={() => { setResultadoImport(null); setModalImportar(true); }}>
+            <Upload size={13} /> Importar reporte
+          </Btn>
+          <Btn small onClick={() => setModalHistorial("new")}>
+            <Plus size={13} /> Agregar tasa de un día
+          </Btn>
+        </div>
       </div>
 
       <div style={{ fontSize: 12, color: C.mut, marginBottom: 12, maxWidth: 640 }}>
@@ -160,6 +169,12 @@ export default function AjustesTasas({ st, act }) {
         vigente ese día. Si nadie abrió el sistema ese día, no queda foto guardada — aquí puedes
         rellenarla a mano para que los pagos atrasados usen la tasa correcta en vez de la de hoy.
       </div>
+
+      {resultadoImport && (
+        <div style={{ background: C.greenSoft, color: C.greenDk, padding: "10px 14px", borderRadius: 10, fontSize: 12.5, marginBottom: 14 }}>
+          {resultadoImport}
+        </div>
+      )}
 
       {historialOrdenado.length === 0 ? (
         <Empty icon={CalendarClock} title="Sin historial todavía" msg="Se va guardando solo cada día que alguien abre el sistema." />
@@ -210,6 +225,17 @@ export default function AjustesTasas({ st, act }) {
           fechasExistentes={Object.keys(st.historialTasas || {})}
           onClose={() => setModalHistorial(null)}
           onSave={(fecha, tasas) => { act.guardarTasaHistorica(fecha, tasas); setModalHistorial(null); }}
+        />
+      )}
+      {modalImportar && (
+        <ImportarHistorialModal
+          historialActual={st.historialTasas || {}}
+          onClose={() => setModalImportar(false)}
+          onImportar={(registros, sobrescribir, resumen) => {
+            act.importarHistorialTasas(registros, sobrescribir);
+            setModalImportar(false);
+            setResultadoImport(resumen);
+          }}
         />
       )}
     </Section>
@@ -265,6 +291,213 @@ function TasaHistoricaModal({ fechaInicial, datosIniciales, fechasExistentes, on
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
         <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
         <Btn onClick={guardar}>Guardar</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+/* ============================================================
+   IMPORTADOR EN LOTE: pega la tabla del reporte histórico
+   ------------------------------------------------------------
+   Acepta filas pegadas desde Excel/Sheets o copiadas del PDF.
+   Cada fila debe traer, EN ESTE ORDEN: Fecha, BCV ($), BCV (€),
+   Paralelo. Ignora en silencio cualquier línea sin fecha válida
+   (encabezados, totales, texto suelto), así se puede pegar el
+   reporte completo sin limpiarlo antes.
+   ============================================================ */
+
+/** Convierte "336,00" / "1.234,56" / "336.00" a número. Devuelve null si no es número. */
+function aNumero(raw) {
+  let s = String(raw ?? "").replace(/[^\d.,-]/g, "");
+  if (s.includes(",") && s.includes(".")) {
+    s = s.lastIndexOf(",") > s.lastIndexOf(".") ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+  } else if (s.includes(",")) {
+    s = s.replace(",", ".");
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Normaliza una fecha DD/MM/AAAA (o AAAA-MM-DD) a AAAA-MM-DD. Devuelve null si no reconoce. */
+function aFechaISO(texto) {
+  const iso = texto.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const dmy = texto.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if (dmy) {
+    let [, d, m, y] = dmy;
+    if (y.length === 2) y = "20" + y;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  return null;
+}
+
+/**
+ * Parsea el texto pegado. Devuelve { validas: [{fecha, tasaBCV, tasaBcvEuro,
+ * tasaParalelo}], invalidas: [textoLinea] }. Una línea es "inválida" solo si
+ * TIENE fecha pero le faltan las 3 tasas; las líneas sin fecha se ignoran.
+ */
+function parsearReporte(texto) {
+  const validas = [];
+  const invalidas = [];
+  texto.split(/\r?\n/).forEach((linea) => {
+    const raw = linea.trim();
+    if (!raw) return;
+    const mFecha = raw.match(/(\d{4}-\d{2}-\d{2})|(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/);
+    if (!mFecha) return; // sin fecha → encabezado/ruido, se ignora
+    const fecha = aFechaISO(mFecha[0]);
+    if (!fecha) return;
+    const restante = raw.slice(mFecha.index + mFecha[0].length);
+    const numeros = (restante.match(/[\d.,]+/g) || [])
+      .map(aNumero)
+      .filter((n) => n !== null && n > 0);
+    if (numeros.length >= 3) {
+      validas.push({ fecha, tasaBCV: numeros[0], tasaBcvEuro: numeros[1], tasaParalelo: numeros[2] });
+    } else {
+      invalidas.push(raw);
+    }
+  });
+  return { validas, invalidas };
+}
+
+function ImportarHistorialModal({ historialActual, onClose, onImportar }) {
+  const [texto, setTexto] = useState("");
+  const [sobrescribir, setSobrescribir] = useState(false);
+  const [leyendo, setLeyendo] = useState(false);
+
+  // Lee un archivo soltado o elegido y vuelca su contenido en el área de
+  // texto (que ya alimenta el parser y la vista previa). Acepta texto plano
+  // (.txt/.csv/.tsv) y también el PDF del reporte directamente.
+  const leerArchivo = async (archivo) => {
+    if (!archivo) return;
+    setLeyendo(true);
+    try {
+      const nombre = (archivo.name || "").toLowerCase();
+      const contenido = nombre.endsWith(".pdf") ? await extraerTextoPDF(archivo) : await archivo.text();
+      setTexto(contenido);
+    } catch (e) {
+      console.warn("No se pudo leer el archivo:", e);
+    }
+    setLeyendo(false);
+  };
+
+  const { arrastrando, dragProps } = useArrastrarArchivo((files) => leerArchivo(files[0]), leyendo);
+
+  const { validas, invalidas } = parsearReporte(texto);
+  const yaExisten = validas.filter((v) => historialActual[v.fecha]).length;
+  const nuevas = validas.length - yaExisten;
+  const aCargar = sobrescribir ? validas.length : nuevas;
+
+  const importar = () => {
+    if (validas.length === 0) return;
+    const registros = {};
+    validas.forEach((v) => {
+      registros[v.fecha] = { tasaBCV: v.tasaBCV, tasaBcvEuro: v.tasaBcvEuro, tasaParalelo: v.tasaParalelo };
+    });
+    const partes = [];
+    if (nuevas > 0) partes.push(`${nuevas} día(s) nuevo(s)`);
+    if (sobrescribir && yaExisten > 0) partes.push(`${yaExisten} actualizado(s)`);
+    if (!sobrescribir && yaExisten > 0) partes.push(`${yaExisten} ya existente(s) sin tocar`);
+    onImportar(registros, sobrescribir, `Historial importado: ${partes.join(", ")}.`);
+  };
+
+  return (
+    <Modal title="Importar reporte de tasas por día" wide onClose={onClose}>
+      <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 10, lineHeight: 1.5 }}>
+        Pega la tabla desde Excel/Sheets o directo del PDF. Cada fila debe traer, en este orden:
+        {" "}<b style={{ color: C.ink }}>Fecha · BCV ($) · BCV (€) · Paralelo</b>. Las líneas sin
+        fecha (encabezados, totales) se ignoran solas — puedes pegar el reporte completo.
+        La <b>Intervención</b> no se importa (no viene en el reporte); se sigue cargando a mano.
+      </div>
+
+      <label
+        {...dragProps}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          padding: "18px 14px",
+          marginBottom: 12,
+          border: `2px dashed ${arrastrando ? C.green : C.line}`,
+          borderRadius: 12,
+          background: arrastrando ? C.greenSoft : C.body,
+          cursor: leyendo ? "default" : "pointer",
+          textAlign: "center",
+          transition: "border-color .15s, background .15s"
+        }}
+      >
+        <input
+          type="file"
+          accept=".txt,.csv,.tsv,.pdf"
+          hidden
+          disabled={leyendo}
+          onChange={(e) => { const a = e.target.files?.[0]; e.target.value = ""; leerArchivo(a); }}
+        />
+        <Upload size={20} color={arrastrando ? C.greenDk : C.mut} />
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: arrastrando ? C.greenDk : C.ink }}>
+          {leyendo ? "Leyendo archivo…" : "Arrastra el archivo aquí o haz clic para elegirlo"}
+        </div>
+        <div style={{ fontSize: 11, color: C.mut }}>
+          Acepta el reporte en PDF o un archivo de texto (.txt, .csv). También puedes pegar la tabla abajo.
+        </div>
+      </label>
+
+      <textarea
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        placeholder={"01/01/2026\tBs. 336,00\tBs. 368,00\tBs. 415,00\n02/01/2026\tBs. 338,75\tBs. 371,44\tBs. 417,40\n..."}
+        rows={10}
+        style={{
+          width: "100%",
+          fontFamily: "monospace",
+          fontSize: 12,
+          border: `1px solid ${C.line}`,
+          borderRadius: 10,
+          padding: 10,
+          resize: "vertical",
+          outline: "none",
+          boxSizing: "border-box"
+        }}
+      />
+
+      {texto.trim() && (
+        <div style={{ background: C.body, padding: "10px 14px", borderRadius: 10, marginTop: 12, fontSize: 12.5 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ color: C.mut }}>Días detectados</span>
+            <b style={{ color: C.ink }}>{validas.length}</b>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ color: C.mut }}>Nuevos / ya en el historial</span>
+            <b style={{ color: C.ink }}>{nuevas} / {yaExisten}</b>
+          </div>
+          {invalidas.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", color: C.rojo }}>
+              <span>Líneas con fecha pero sin 3 tasas (se omiten)</span>
+              <b>{invalidas.length}</b>
+            </div>
+          )}
+          {validas.length > 0 && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px dashed ${C.line}`, color: C.mut, fontSize: 11.5 }}>
+              Ej.: {validas[0].fecha} → BCV {nf.format(validas[0].tasaBCV)} · € {nf.format(validas[0].tasaBcvEuro)} · Paralelo {nf.format(validas[0].tasaParalelo)}
+              {validas.length > 1 && <> … hasta {validas[validas.length - 1].fecha}</>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {yaExisten > 0 && (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
+          <input type="checkbox" checked={sobrescribir} onChange={(e) => setSobrescribir(e.target.checked)} />
+          Sobrescribir también los {yaExisten} día(s) que ya están guardados (la Intervención de esos días se conserva)
+        </label>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+        <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+        <Btn onClick={importar} disabled={aCargar === 0}>
+          Importar {aCargar > 0 ? `${aCargar} día(s)` : ""}
+        </Btn>
       </div>
     </Modal>
   );

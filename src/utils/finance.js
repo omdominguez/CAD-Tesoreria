@@ -357,6 +357,46 @@ export function tasaSegunFormaPago(st, formaPago) {
   }
 }
 
+/**
+ * Busca el valor de UNA tasa (tasaBCV, tasaParalelo, tasaBcvEuro...) tal como
+ * regía en una fecha dada: recorre historialTasas desde el día más cercano
+ * ANTERIOR o IGUAL a esa fecha hacia atrás, y devuelve el primer valor > 0
+ * que encuentre para esa tasa. Si esa fecha es previa a todo el historial (o
+ * el historial no tiene ese dato), cae a la tasa actual de config (hoy). Así
+ * un cobro/pago con fecha atrasada se convierte con la tasa correcta de ese
+ * día, y no se rompe si un día del historial quedó con esa tasa en blanco.
+ */
+function tasaKeyEnFecha(st, key, fecha) {
+  const hist = st.historialTasas || {};
+  const cfg = st.config || {};
+  if (fecha) {
+    const fechas = Object.keys(hist).filter((f) => f <= fecha).sort();
+    for (let i = fechas.length - 1; i >= 0; i--) {
+      const v = Number(hist[fechas[i]]?.[key]) || 0;
+      if (v > 0) return v;
+    }
+  }
+  return Number(cfg[key]) || 0;
+}
+
+/**
+ * Igual que tasaSegunFormaPago, pero para una fecha específica: toma la tasa
+ * que estaba vigente ESE día (según historialTasas) en lugar de la de hoy.
+ * Se usa al registrar cobranzas con fecha atrasada, para que el equivalente
+ * en USD se calcule con la tasa histórica correcta.
+ *
+ * @returns {number|null} la tasa a usar, o null si la forma de pago es USD directo.
+ */
+export function tasaSegunFormaPagoEnFecha(st, formaPago, fecha) {
+  switch (formaPago) {
+    case "BS_PARALELO": return tasaKeyEnFecha(st, "tasaParalelo", fecha) || 1;
+    case "BS_BCV_EUR": return tasaKeyEnFecha(st, "tasaBcvEuro", fecha) || 1;
+    case "BS_BCV": return tasaKeyEnFecha(st, "tasaBCV", fecha) || 1;
+    case "BS": return tasaKeyEnFecha(st, "tasaBCV", fecha) || 1; // compatibilidad pedidos antiguos
+    default: return null; // "USD" — sin conversión
+  }
+}
+
 export const FORMAS_PAGO = [
   { id: "USD", label: "Dólares (USD)" },
   { id: "BS_BCV", label: "Bolívares — tasa BCV ($)" },

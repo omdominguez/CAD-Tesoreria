@@ -40,10 +40,29 @@ export function crearAccionesTasas(setSt, userId) {
         return next;
       });
     },
-    eliminarTasaHistorica: (fecha) => {
+    /**
+     * Carga en lote varios días al historial de tasas (para alimentar el
+     * sistema desde un reporte histórico ya armado, en vez de día por día).
+     * @param registros objeto { 'YYYY-MM-DD': { tasaBCV, tasaBcvEuro, tasaParalelo } }
+     * @param sobrescribir si es false, los días que YA existen en el historial
+     *   se dejan intactos (solo se agregan los que faltan); si es true, se
+     *   reemplazan también. En ambos casos, la Intervención de un día que ya
+     *   existía se PRESERVA (el reporte no la trae — se sigue poniendo a mano).
+     */
+    importarHistorialTasas: (registros, sobrescribir = false) => {
       setSt((prev) => {
         const historialTasas = { ...(prev.historialTasas || {}) };
-        delete historialTasas[fecha];
+        Object.entries(registros || {}).forEach(([fecha, t]) => {
+          const existe = Boolean(historialTasas[fecha]);
+          if (existe && !sobrescribir) return; // no pisar lo ya guardado
+          const previo = historialTasas[fecha] || {};
+          historialTasas[fecha] = {
+            tasaBCV: Number(t.tasaBCV) || 0,
+            tasaParalelo: Number(t.tasaParalelo) || 0,
+            tasaBcvEuro: Number(t.tasaBcvEuro) || 0,
+            tasaIntervencion: Number(previo.tasaIntervencion) || 0
+          };
+        });
         const next = { ...prev, historialTasas };
         saveState(next, userId).catch(console.error);
         return next;

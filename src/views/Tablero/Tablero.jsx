@@ -321,7 +321,7 @@ export default function Tablero({ st }) {
       )}
 
       {/* 4. Variación mensual de la tasa BCV (historial externo) */}
-      <VariacionMensualBCV />
+      <VariacionMensualBCV st={st} />
     </Section>
   );
 }

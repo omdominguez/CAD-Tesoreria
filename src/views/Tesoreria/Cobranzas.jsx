@@ -12,7 +12,7 @@ import {
   activoCxC, 
   pendienteCxC,
   cobranzaAUsd,
-  tasaSegunFormaPago,
+  tasaSegunFormaPagoEnFecha,
   FORMAS_PAGO
 } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
@@ -162,8 +162,10 @@ function CobranzaModal({ st, clientes, onClose, onSave }) {
   const [subiendoComprobante, setSubiendoComprobante] = useState(false);
 
   // La factura siempre vive en USD — la "forma de pago" es en qué moneda
-  // llegó realmente el dinero, y de ahí sale la tasa a usar hoy.
-  const tasaAplicable = tasaSegunFormaPago(st, f.formaPago); // null si es USD directo
+  // llegó realmente el dinero, y de ahí sale la tasa. Se usa la tasa que
+  // regía en la FECHA del pago (f.fecha), no la de hoy, para que un cobro
+  // con fecha atrasada se convierta con la tasa histórica correcta.
+  const tasaAplicable = tasaSegunFormaPagoEnFecha(st, f.formaPago, f.fecha); // null si es USD directo
   const monedaPago = f.formaPago === "USD" ? "USD" : "BS";
   const montoUSD = tasaAplicable && f.monto ? Number(f.monto) / tasaAplicable : Number(f.monto || 0);
 
@@ -201,7 +203,7 @@ function CobranzaModal({ st, clientes, onClose, onSave }) {
     // Si la factura tiene su propia forma de pago esperada, la usamos para
     // sugerir el monto ya convertido; si no, se mantiene la que ya estaba elegida.
     const formaPagoSugerida = fac.formaPago || f.formaPago;
-    const tasaSugerida = tasaSegunFormaPago(st, formaPagoSugerida);
+    const tasaSugerida = tasaSegunFormaPagoEnFecha(st, formaPagoSugerida, f.fecha);
     const pendienteUSD = pendienteCxC(st, fac);
     const montoSugerido = tasaSugerida ? Number((pendienteUSD * tasaSugerida).toFixed(2)) : pendienteUSD;
 

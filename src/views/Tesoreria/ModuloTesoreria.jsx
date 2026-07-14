@@ -35,7 +35,7 @@ export default function ModuloTesoreria({ st, act, rol, usuario }) {
       {sub === "cobranzas" && <Cobranzas st={st} act={act} rol={rol} />}
       {sub === "cxp" && <CuentasPorPagar st={st} act={act} rol={rol} />}
       {sub === "corridas" && <Corridas st={st} act={act} rol={rol} usuario={usuario} />}
-      {sub === "libro" && <LibroBancos st={st} />}
+      {sub === "libro" && <LibroBancos st={st} act={act} rol={rol} usuario={usuario} />}
     </div>
   );
 }

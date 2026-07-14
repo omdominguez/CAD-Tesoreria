@@ -1,5 +1,5 @@
 import React, { useState, Fragment } from "react";
-import { FileText, CalendarClock, CalendarDays, Plus, Paperclip, Trash2 } from "lucide-react";
+import { FileText, CalendarClock, CalendarDays, Plus, Paperclip, Trash2, ChevronDown, Layers } from "lucide-react";
 
 // Tema y Finanzas
 import { C } from "../../constants/theme";
@@ -28,11 +28,18 @@ import CalendarioPagos from "./CalendarioPagos";
 import KpiCompras from "./KpiCompras";
 import FormCompromiso from "./FormCompromiso";
 
+const hoyStr = () => new Date().toISOString().slice(0, 10);
+
+// Cuántas cuotas PENDIENTES próximas (aún no vencidas) se muestran de una vez,
+// antes de colapsar el resto detrás de un botón "Ver las N restantes".
+const PROXIMAS_VISIBLES = 2;
+
 export default function Compromisos({ st, act, rol }) {
   const [modal, setModal] = useState(null); // 'new', 'adj', null
   const [f, setF] = useState({}); // Solo lo usaremos para el modal pequeño de adjuntos
   const [filtro, setFiltro] = useState("TODOS");
   const [vista, setVista] = useState("lista");
+  const [gruposExpandidos, setGruposExpandidos] = useState(new Set());
   
   const puedeCrear = rol === "COMPRAS" || rol === "MASTER";
   const proveedores = (st.proveedores || []).filter(esProv);
@@ -43,10 +50,49 @@ export default function Compromisos({ st, act, rol }) {
     return filtro === "TODOS" ? e !== "ANULADO" : e === filtro; 
   };
   
-  const lista = (st.compromisos || [])
+  const listaBase = (st.compromisos || [])
     .filter((c) => !c.anulado && pasa(c))
     .sort((a, b) => (a.fechaVencimiento || "").localeCompare(b.fechaVencimiento || ""));
-    
+
+  // Agrupamos por financiamiento (grupoFinanciamientoId) y, dentro de cada
+  // grupo, solo mostramos de entrada: las vencidas, las ya pagadas, y las
+  // próximas N por vencer — el resto queda detrás de "Ver las N restantes".
+  const hoy = hoyStr();
+  const gruposMap = {};
+  listaBase.forEach((c) => {
+    const gid = c.grupoFinanciamientoId || c.id; // sin grupo = grupo de 1
+    if (!gruposMap[gid]) gruposMap[gid] = [];
+    gruposMap[gid].push(c);
+  });
+
+  const lista = [];
+  Object.entries(gruposMap).forEach(([gid, items]) => {
+    if (items.length === 1 || gruposExpandidos.has(gid)) {
+      items.forEach((c) => lista.push({ tipo: "fila", c }));
+      return;
+    }
+
+    const vencidasOPagadas = [];
+    const proximasPendientes = [];
+    items.forEach((c) => {
+      const e = estadoDe(st, c);
+      const vencida = e !== "PAGADO" && (c.fechaVencimiento || "") < hoy;
+      if (e === "PAGADO" || e === "PARCIAL" || vencida) vencidasOPagadas.push(c);
+      else proximasPendientes.push(c);
+    });
+
+    const visiblesExtra = proximasPendientes.slice(0, PROXIMAS_VISIBLES);
+    const ocultas = proximasPendientes.slice(PROXIMAS_VISIBLES);
+
+    [...vencidasOPagadas, ...visiblesExtra]
+      .sort((a, b) => (a.fechaVencimiento || "").localeCompare(b.fechaVencimiento || ""))
+      .forEach((c) => lista.push({ tipo: "fila", c }));
+
+    if (ocultas.length > 0) {
+      lista.push({ tipo: "resumen", gid, cantidad: ocultas.length, siguienteFecha: ocultas[0]?.fechaVencimiento, descripcionBase: items[0].descripcion.replace(/\s*\(.*?\)\s*$/, "") });
+    }
+  });
+
   const pg = usePaged(lista, 10);
 
   // Utilidad para buscar los comprobantes de pago asociados a un compromiso
@@ -71,10 +117,27 @@ export default function Compromisos({ st, act, rol }) {
             { id: "calendario", label: "Calendario", icon: CalendarDays }
           ]} 
         />
-        {puedeCrear && vista === "lista" && (
-          <Btn onClick={() => setModal("new")} disabled={proveedores.length === 0}>
-            <Plus size={15} /> Nuevo pedido / financiamiento
-          </Btn>
+        {vista === "lista" && (
+          <div style={{ display: "flex", gap: 8 }}>
+            {rol === "MASTER" && (
+              <Btn
+                variant="ghost"
+                title="Agrupa cuotas de financiamientos viejos que quedaron sueltas"
+                onClick={() => {
+                  if (!window.confirm("Esto revisa todas las compras y agrupa las que compartan el mismo proveedor y descripción base (por ejemplo, las 36 cuotas del galpón), para que dejen de mostrarse todas sueltas. No cambia montos ni fechas, solo las agrupa visualmente. ¿Continuar?")) return;
+                  const n = act.agruparCuotasAntiguas();
+                  alert(n > 0 ? `Se agruparon ${n} cuota(s) en total.` : "No se encontraron cuotas sueltas para agrupar.");
+                }}
+              >
+                <Layers size={15} /> Agrupar cuotas antiguas
+              </Btn>
+            )}
+            {puedeCrear && (
+              <Btn onClick={() => setModal("new")} disabled={proveedores.length === 0}>
+                <Plus size={15} /> Nuevo pedido / financiamiento
+              </Btn>
+            )}
+          </div>
         )}
       </div>
 
@@ -118,7 +181,26 @@ export default function Compromisos({ st, act, rol }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {pg.slice.map((c) => {
+                    {pg.slice.map((item) => {
+                      if (item.tipo === "resumen") {
+                        return (
+                          <tr key={"resumen-" + item.gid} style={{ background: C.body }}>
+                            <td colSpan={8} style={{ padding: "10px 14px" }}>
+                              <button
+                                onClick={() => setGruposExpandidos((prev) => new Set(prev).add(item.gid))}
+                                style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, color: C.mut, fontSize: 12.5, fontWeight: 600, padding: 0, width: "100%", textAlign: "left" }}
+                              >
+                                <Layers size={14} />
+                                Ver las {item.cantidad} cuota(s) restante(s) de "{item.descripcionBase}"
+                                {item.siguienteFecha && <span style={{ color: C.mut2 }}>· la siguiente vence {fmtD(item.siguienteFecha)}</span>}
+                                <ChevronDown size={14} style={{ marginLeft: "auto" }} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      const c = item.c;
                       const e = estadoDe(st, c); 
                       const tone = e === "PAGADO" ? "verde" : e === "PARCIAL" ? "amar" : "gold";
                       const comps = comprobantesDe(c.id);

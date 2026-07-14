@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Layers, ShieldCheck, Check, X, Download, Clock, UserCheck } from "lucide-react";
+import { Layers, ShieldCheck, X, Download, Clock } from "lucide-react";
 
 // Tema y Utilidades
 import { C, FONTS } from "../../constants/theme";
@@ -21,9 +21,9 @@ const estadoTone = {
 };
 
 const estadoLbl = {
-  PENDIENTE_AUTORIZACION: "Pendiente por autorizar",
-  AUTORIZADA: "Autorizada",
-  EJECUTADA: "Ejecutada",
+  PENDIENTE_AUTORIZACION: "Por aprobar",
+  AUTORIZADA: "Aprobada",
+  EJECUTADA: "Pagada",
   RECHAZADA: "Rechazada"
 };
 
@@ -75,7 +75,7 @@ export default function Corridas({ st, act, rol, usuario }) {
   return (
     <Section
       title="Corridas de pago"
-      desc="Agrupa compromisos en Bs en un lote y envíalo a autorización de gerencia — reemplaza el formato físico de Anticipo a Proveedores."
+      desc="Agrupa varios pagos en Bs, mándalos a aprobar, y quedan pagados apenas Gerencia los aprueba."
     >
       {/* CREADOR DE NUEVA CORRIDA */}
       {puedeCrear && (
@@ -168,8 +168,8 @@ export default function Corridas({ st, act, rol, usuario }) {
                     <Btn small variant="danger" onClick={() => act.rechazarCorrida(co.id, usuario)}>
                       <X size={13} /> Rechazar
                     </Btn>
-                    <Btn small variant="gold" onClick={() => act.aprobarCorrida(co.id, usuario)}>
-                      <ShieldCheck size={13} /> Aprobar
+                    <Btn small variant="gold" onClick={() => act.aprobarYPagarCorrida(co.id, usuario)}>
+                      <ShieldCheck size={13} /> Aprobar y pagar
                     </Btn>
                   </div>
                 )}
@@ -234,11 +234,32 @@ function CorridaModal({ st, corrida, act, rol, usuario, puedeAprob, onClose }) {
         </div>
       </div>
 
-      {/* Rastro de aprobación — el reemplazo de las firmas del papel */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 16 }}>
-        <RastroItem icono={UserCheck} etiqueta="Ejecutado por (Compras)" nombre={corrida.creadoPor} fecha={corrida.fechaCreacion} />
-        <RastroItem icono={corrida.estado === "RECHAZADA" ? X : ShieldCheck} etiqueta={corrida.estado === "RECHAZADA" ? "Rechazado por" : "Autorizado por (Gerencia)"} nombre={corrida.estado === "RECHAZADA" ? corrida.rechazadoPor : corrida.autorizadoPor} fecha={corrida.estado === "RECHAZADA" ? corrida.fechaRechazo : corrida.fechaAutorizacion} pendiente={corrida.estado === "PENDIENTE_AUTORIZACION"} />
-        <RastroItem icono={Check} etiqueta="Ejecutado en Tesorería" nombre={corrida.ejecutadoPorAdmin} fecha={corrida.fechaEjecucion} pendiente={corrida.estado !== "EJECUTADA"} />
+      {/* Rastro de aprobación — simple: quién la armó y quién la aprobó/pagó */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 24, marginBottom: 16, padding: "12px 14px", background: C.body, borderRadius: 10 }}>
+        <div>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 3 }}>Armada por</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{corrida.creadoPor || "—"}</div>
+          <div style={{ fontSize: 11, color: C.mut }}>{fmtD(corrida.fechaCreacion)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 3 }}>
+            {corrida.estado === "RECHAZADA" ? "Rechazada por" : corrida.estado === "PENDIENTE_AUTORIZACION" ? "Aprobación" : "Aprobada y pagada por"}
+          </div>
+          {corrida.estado === "PENDIENTE_AUTORIZACION" ? (
+            <div style={{ fontSize: 12.5, color: C.mut, fontStyle: "italic", display: "flex", alignItems: "center", gap: 5 }}>
+              <Clock size={12} /> Esperando a Gerencia
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+                {corrida.estado === "RECHAZADA" ? corrida.rechazadoPor : corrida.autorizadoPor}
+              </div>
+              <div style={{ fontSize: 11, color: C.mut }}>
+                {fmtD(corrida.estado === "RECHAZADA" ? corrida.fechaRechazo : corrida.fechaAutorizacion)}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div style={{ overflowX: "auto", border: `1px solid ${C.line}`, borderRadius: 12 }}>
@@ -276,39 +297,13 @@ function CorridaModal({ st, corrida, act, rol, usuario, puedeAprob, onClose }) {
               <Btn variant="danger" onClick={() => { act.rechazarCorrida(corrida.id, usuario); onClose(); }}>
                 Rechazar
               </Btn>
-              <Btn variant="gold" onClick={() => { act.aprobarCorrida(corrida.id, usuario); onClose(); }}>
-                <ShieldCheck size={15} /> Aprobar corrida
+              <Btn variant="gold" onClick={() => { act.aprobarYPagarCorrida(corrida.id, usuario); onClose(); }}>
+                <ShieldCheck size={15} /> Aprobar y pagar
               </Btn>
             </>
-          )}
-
-          {corrida.estado === "AUTORIZADA" && (
-            <Btn onClick={() => { act.ejecutarCorrida(corrida.id, usuario); onClose(); }}>
-              <Check size={15} /> Marcar transferencias ejecutadas
-            </Btn>
           )}
         </div>
       </div>
     </Modal>
-  );
-}
-
-function RastroItem({ icono: Icono, etiqueta, nombre, fecha, pendiente }) {
-  return (
-    <div style={{ padding: "10px 12px", border: `1px solid ${C.line}`, borderRadius: 10, background: pendiente ? C.body : C.surface }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>
-        <Icono size={12} /> {etiqueta}
-      </div>
-      {pendiente || !nombre ? (
-        <div style={{ fontSize: 12.5, color: C.mut, fontStyle: "italic", display: "flex", alignItems: "center", gap: 5 }}>
-          <Clock size={12} /> Pendiente
-        </div>
-      ) : (
-        <>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{nombre}</div>
-          <div style={{ fontSize: 11, color: C.mut }}>{fmtD(fecha)}</div>
-        </>
-      )}
-    </div>
   );
 }

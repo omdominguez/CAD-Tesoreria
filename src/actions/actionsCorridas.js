@@ -49,6 +49,63 @@ export function crearAccionesCorridas(setSt, userId) {
         return next;
       });
     },
+    /**
+     * Aprobar y pagar en un solo paso — pensado para simplificar el flujo:
+     * antes había un estado intermedio "Autorizada" donde alguien todavía
+     * tenía que entrar de nuevo a marcarla como ejecutada. Ahora Master
+     * aprueba y en el mismo clic se registran los pagos, sin ese paso extra.
+     */
+    aprobarYPagarCorrida: (id, autorizadoPor) => {
+      setSt((prev) => {
+        const co = (prev.corridas || []).find((x) => x.id === id);
+        if (!co) return prev;
+
+        const hoy = new Date().toISOString().slice(0, 10);
+        const nuevosMovimientos = [...(prev.movimientos || [])];
+        const nuevosBancos = [...(prev.bancos || [])];
+
+        (prev.compromisos || [])
+          .filter((c) => co.compromisoIds.includes(c.id))
+          .forEach((c) => {
+            const bId = c.bancoAsignadoId || (prev.bancos || []).find((b) => b.moneda === "BS")?.id;
+            const tasaAplicable = tasaSegunFormaPago(prev, c.formaPago || c.moneda);
+            const montoBs = tasaAplicable !== null ? Number(c.montoOriginal) * tasaAplicable : Number(c.montoOriginal);
+
+            nuevosMovimientos.push({
+              id: crypto.randomUUID(),
+              compromisoId: c.id,
+              monto: montoBs,
+              moneda: "BS",
+              tasaBcvPago: tasaAplicable !== null ? tasaAplicable : null,
+              fecha: hoy,
+              tipo: "TRANSFERENCIA",
+              bancoOrigenId: bId,
+              referencia: `Corrida ${co.codigo}`,
+              adjuntos: []
+            });
+
+            if (bId) {
+              const idx = nuevosBancos.findIndex((b) => b.id === bId);
+              if (idx !== -1) {
+                nuevosBancos[idx] = { ...nuevosBancos[idx], saldoActual: Number(nuevosBancos[idx].saldoActual) - Number(montoBs) };
+              }
+            }
+          });
+
+        const next = {
+          ...prev,
+          corridas: (prev.corridas || []).map((x) =>
+            x.id === id
+              ? { ...x, estado: "EJECUTADA", autorizadoPor: autorizadoPor || null, fechaAutorizacion: hoy, ejecutadoPorAdmin: autorizadoPor || null, fechaEjecucion: hoy }
+              : x
+          ),
+          movimientos: nuevosMovimientos,
+          bancos: nuevosBancos
+        };
+        saveState(next, userId).catch(console.error);
+        return next;
+      });
+    },
     rechazarCorrida: (id, rechazadoPor) => {
       setSt((prev) => {
         const next = {

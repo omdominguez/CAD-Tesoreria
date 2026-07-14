@@ -20,6 +20,7 @@ import { crearAccionesCompras } from "./actionsCompras";
 import { crearAccionesPagos } from "./actionsPagos";
 import { crearAccionesCorridas } from "./actionsCorridas";
 import { crearAccionesVentas } from "./actionsVentas";
+import { crearAccionesConciliacion } from "./actionsConciliacion";
 
 /**
  * Arma el objeto `act` completo que usa toda la app.
@@ -35,5 +36,6 @@ export function crearAcciones(setSt, userId) {
     ...crearAccionesPagos(setSt, userId),
     ...crearAccionesCorridas(setSt, userId),
     ...crearAccionesVentas(setSt, userId),
+    ...crearAccionesConciliacion(setSt, userId),
   };
 }

@@ -1,78 +1,31 @@
 import React, { useState, useMemo } from "react";
-import { Landmark, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Landmark, ArrowUpRight, ArrowDownLeft, Pencil, History } from "lucide-react";
 
 // Subir 2 niveles para llegar a src/
 import { C, FONTS } from "../../constants/theme";
-import { money, fmtD, provNom } from "../../utils/finance";
+import { money, fmtD, construirLedgerBanco } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
 
 // Componentes UI
-import { Section, Card, Empty } from "../../components/ui/Layout";
+import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
 import { Th, Td, Pagination } from "../../components/ui/Table";
-import { Select } from "../../components/ui/Forms";
+import { Select, Input, Field } from "../../components/ui/Forms";
+import { Btn } from "../../components/ui/Buttons";
 import { Badge } from "../../components/ui/Data";
 
-export default function LibroBancos({ st }) {
+export default function LibroBancos({ st, act, rol, usuario }) {
   const bancos = st.bancos || [];
-  
+  const esMaster = rol === "MASTER";
+  const [editando, setEditando] = useState(null); // id del movimiento en edición, o null
+
   // Inicializar con el primer banco si existe
   const [bancoId, setBancoId] = useState(bancos[0]?.id || "");
 
   const bancoSel = bancos.find((b) => b.id === bancoId);
 
-  // Construcción eficiente y aislada del libro mayor (Ledger) del banco seleccionado
-  const historial = useMemo(() => {
-    if (!bancoId) return [];
-
-    const rows = [];
-
-    // 1. Inyectar todos los pagos/egresos que salieron de este banco
-    (st.movimientos || [])
-      .filter((m) => m.bancoOrigenId === bancoId)
-      .forEach((m) => {
-        const comp = (st.compromisos || []).find((c) => c.id === m.compromisoId);
-        rows.push({
-          id: m.id,
-          fecha: m.fecha || "",
-          concepto: comp ? provNom(st, comp.proveedorId) : "Egreso",
-          detalle: comp ? (comp.descripcion || "Pago de compromiso") : "Movimiento de caja",
-          referencia: m.referencia || "—",
-          tipo: "DEBITO", // El dinero sale del banco
-          monto: Number(m.monto || 0),
-        });
-      });
-
-    // 2. Inyectar todas las cobranzas/ingresos que entraron a este banco
-    (st.cobranzas || [])
-      .filter((c) => c.bancoDestinoId === bancoId)
-      .forEach((c) => {
-        rows.push({
-          id: c.id,
-          fecha: c.fecha || "",
-          concepto: provNom(st, c.clienteId),
-          detalle: c.descripcion || "Cobranza recibida",
-          referencia: "Ingreso directo",
-          tipo: "CREDITO", // El dinero entra al banco
-          monto: Number(c.monto || 0),
-        });
-      });
-
-    // 3. Ordenar cronológicamente (de más antiguo a más reciente) para calcular el saldo progresivo
-    rows.sort((a, b) => a.fecha.localeCompare(b.fecha));
-
-    // 4. Reconstruir la corrida de saldos partiendo del saldo inicial teórico
-    let saldoAcumulado = Number(bancoSel?.saldoInicial || 0);
-    
-    const rowsConSaldo = rows.map((r) => {
-      if (r.tipo === "CREDITO") saldoAcumulado += r.monto;
-      else if (r.tipo === "DEBITO") saldoAcumulado -= r.monto;
-      
-      return { ...r, saldoProgresivo: saldoAcumulado };
-    });
-
-    // 5. Invertir el resultado final para que el usuario vea lo más nuevo arriba
-    return rowsConSaldo.reverse();
-  }, [st.movimientos, st.cobranzas, bancoId, bancoSel]);
+  // Construcción del libro mayor (ledger) del banco seleccionado — lógica
+  // compartida con las tarjetas de Ajustes → Bancos (utils/finance.js)
+  const historial = useMemo(() => construirLedgerBanco(st, bancoId), [st, bancoId]);
 
   const pg = usePaged(historial, 15);
 
@@ -135,6 +88,7 @@ export default function LibroBancos({ st }) {
                   <Th right>Egresos (Cargo)</Th>
                   <Th right>Ingresos (Abono)</Th>
                   <Th right>Saldo en cuenta</Th>
+                  {esMaster && <Th right>Acciones</Th>}
                 </tr>
               </thead>
               <tbody>
@@ -142,8 +96,17 @@ export default function LibroBancos({ st }) {
                   <tr key={r.id}>
                     <Td>{fmtD(r.fecha)}</Td>
                     <Td>
-                      <div style={{ fontWeight: 700, color: C.ink }}>{r.concepto}</div>
-                      <div style={{ fontSize: 11.5, color: C.mut }}>{r.detalle}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div>
+                          <div style={{ fontWeight: 700, color: C.ink }}>{r.concepto}</div>
+                          <div style={{ fontSize: 11.5, color: C.mut }}>{r.detalle}</div>
+                        </div>
+                        {r.editado && (
+                          <span title={`Editado por ${r.editadoPor || "—"} el ${fmtD(r.fechaEdicion)}`}>
+                            <Badge tone="amar"><History size={10} /> Editado</Badge>
+                          </span>
+                        )}
+                      </div>
                     </Td>
                     <Td><Badge tone="mut">{r.referencia}</Badge></Td>
                     <Td right>
@@ -163,6 +126,15 @@ export default function LibroBancos({ st }) {
                     <Td right bold style={{ fontVariantNumeric: "tabular-nums" }}>
                       {money(r.saldoProgresivo, bancoSel?.moneda)}
                     </Td>
+                    {esMaster && (
+                      <Td right>
+                        {r.esMovimiento && (
+                          <Btn small variant="ghost" onClick={() => setEditando(r.id)}>
+                            <Pencil size={12} /> Corregir
+                          </Btn>
+                        )}
+                      </Td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -171,6 +143,76 @@ export default function LibroBancos({ st }) {
           <Pagination pg={pg} />
         </Card>
       )}
+
+      {editando && (
+        <EditarMovimientoModal
+          st={st}
+          movimiento={(st.movimientos || []).find((m) => m.id === editando)}
+          onClose={() => setEditando(null)}
+          onSave={(cambios) => {
+            act.editarMovimiento(editando, cambios, usuario);
+            setEditando(null);
+          }}
+        />
+      )}
     </Section>
+  );
+}
+
+/* ============================================================
+   COMPONENTE AISLADO: CORREGIR UN PAGO YA REGISTRADO (SOLO MASTER)
+   ------------------------------------------------------------
+   No borra el movimiento — permite corregir monto/fecha/banco/
+   referencia. La acción editarMovimiento se encarga de reversar
+   el efecto viejo en el saldo del banco y aplicar el nuevo, y de
+   dejar el rastro de auditoría (quién y cuándo lo corrigió).
+   ============================================================ */
+function EditarMovimientoModal({ st, movimiento, onClose, onSave }) {
+  const [monto, setMonto] = useState(String(movimiento?.monto ?? ""));
+  const [fecha, setFecha] = useState(movimiento?.fecha || "");
+  const [referencia, setReferencia] = useState(movimiento?.referencia || "");
+  const [bancoOrigenId, setBancoOrigenId] = useState(movimiento?.bancoOrigenId || "");
+
+  if (!movimiento) return null;
+
+  const guardar = () => {
+    if (!(Number(monto) > 0) || !fecha) return;
+    onSave({ monto: Number(monto), fecha, referencia, bancoOrigenId });
+  };
+
+  return (
+    <Modal title="Corregir pago registrado" onClose={onClose}>
+      <div style={{ background: C.amarSoft, color: C.amar, padding: "9px 12px", borderRadius: 10, fontSize: 12, marginBottom: 14 }}>
+        Esto no borra el pago — corrige sus datos y ajusta el saldo del banco automáticamente. Quedará marcado como "Editado" con tu nombre y la fecha.
+      </div>
+
+      <Field label="Monto">
+        <Input type="number" value={monto} onChange={(e) => setMonto(e.target.value)} />
+      </Field>
+      <Field label="Fecha">
+        <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+      </Field>
+      <Field label="Banco de origen">
+        <Select value={bancoOrigenId} onChange={(e) => setBancoOrigenId(e.target.value)}>
+          {(st.bancos || []).map((b) => (
+            <option key={b.id} value={b.id}>{b.nombre} ({b.moneda})</option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Referencia">
+        <Input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+      </Field>
+
+      {movimiento.historialEdiciones?.length > 0 && (
+        <div style={{ fontSize: 11.5, color: C.mut, marginTop: 4, marginBottom: 10 }}>
+          Ya se corrigió {movimiento.historialEdiciones.length} vez/veces antes de esto.
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+        <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+        <Btn onClick={guardar}>Guardar corrección</Btn>
+      </div>
+    </Modal>
   );
 }

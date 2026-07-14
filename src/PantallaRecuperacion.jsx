@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "./services/auth";
-import { LOGO } from "./logo.jsx";
+import { LOGO_CAD_VENEZUELA } from "./logo.jsx";
 import { C, FONTS, UI } from "./constants/theme";
 import { ChecklistPassword } from "./components/ChecklistPassword.jsx";
 import { passwordEsValida } from "./utils/validarPassword.js";
@@ -40,7 +40,7 @@ export default function PantallaRecuperacion() {
     <div style={{ minHeight: "100vh", background: C.body, fontFamily: FONTS.SANS, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ width: "100%", maxWidth: 384 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 26 }}>
-          <img src={LOGO} alt="CAD Venezuela" style={{ height: 56, display: "block" }} />
+          <img src={LOGO_CAD_VENEZUELA} alt="CAD Venezuela" style={{ height: 72, display: "block" }} />
         </div>
 
         <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: UI.RADIUS + 2, padding: 26, boxShadow: UI.SHADOW }}>

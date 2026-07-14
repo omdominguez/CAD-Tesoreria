@@ -150,7 +150,67 @@ export const bancoNom = (st, id) => banco(st, id)?.nombre || "Sin asignar";
 
 export const bancosProv = (p) => Array.isArray(p?.bancos) ? p.bancos : (p?.bancoDestino ? [{ banco: p.bancoDestino, cuenta: p.cuentaDestino || "" }] : []);
 
-/** Busca una cuenta bancaria específica de un proveedor por su id. */
+/**
+ * Construye el libro mayor (ledger) de UNA cuenta bancaria: todos los
+ * pagos que salieron de ella y todas las cobranzas que entraron, en
+ * orden cronológico, con el saldo progresivo calculado paso a paso.
+ * Se usa tanto en el Libro de Bancos como en las tarjetas de Ajustes → Bancos.
+ */
+export function construirLedgerBanco(st, bancoId) {
+  if (!bancoId) return [];
+  const bancoSel = (st.bancos || []).find((b) => b.id === bancoId);
+  const rows = [];
+
+  (st.movimientos || [])
+    .filter((m) => m.bancoOrigenId === bancoId)
+    .forEach((m) => {
+      const comp = (st.compromisos || []).find((c) => c.id === m.compromisoId);
+      rows.push({
+        id: m.id,
+        origen: "movimiento",
+        idOriginal: m.id,
+        fecha: m.fecha || "",
+        concepto: comp ? provNom(st, comp.proveedorId) : "Egreso",
+        detalle: comp ? (comp.descripcion || "Pago de compromiso") : "Movimiento de caja",
+        referencia: m.referencia || "—",
+        tipo: "DEBITO",
+        monto: Number(m.monto || 0),
+        esMovimiento: true,
+        conciliado: !!m.conciliado,
+        editado: !!m.editado,
+        editadoPor: m.editadoPor,
+        fechaEdicion: m.fechaEdicion
+      });
+    });
+
+  (st.cobranzas || [])
+    .filter((c) => c.bancoDestinoId === bancoId)
+    .forEach((c) => {
+      rows.push({
+        id: c.id,
+        origen: "cobranza",
+        idOriginal: c.id,
+        fecha: c.fecha || "",
+        concepto: provNom(st, c.clienteId),
+        detalle: c.descripcion || "Cobranza recibida",
+        referencia: "Ingreso directo",
+        tipo: "CREDITO",
+        monto: Number(c.monto || 0),
+        conciliado: !!c.conciliado
+      });
+    });
+
+  rows.sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+  let saldoAcumulado = Number(bancoSel?.saldoInicial || 0);
+  const rowsConSaldo = rows.map((r) => {
+    if (r.tipo === "CREDITO") saldoAcumulado += r.monto;
+    else if (r.tipo === "DEBITO") saldoAcumulado -= r.monto;
+    return { ...r, saldoProgresivo: saldoAcumulado };
+  });
+
+  return rowsConSaldo.reverse();
+}
 export const cuentaProvPorId = (p, cuentaId) => bancosProv(p).find((b) => b.id === cuentaId) || null;
 
 /** Texto corto para mostrar una cuenta bancaria de proveedor (banco + últimos dígitos, SWIFT si es internacional, o wallet si es cripto). */

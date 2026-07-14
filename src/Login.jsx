@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "./services/auth";
-import { LOGO, LOGO_MAIZALITO } from "./logo.jsx";
+import { LOGO_CAD_VENEZUELA, LOGO_MAIZALITO } from "./logo.jsx";
 import { C, FONTS, UI } from "./constants/theme";
 import { ChecklistPassword } from "./components/ChecklistPassword.jsx";
 import { passwordEsValida } from "./utils/validarPassword.js";
@@ -72,7 +72,7 @@ export default function Login() {
     <div style={{ minHeight: "100vh", background: C.body, fontFamily: FONTS.SANS, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ width: "100%", maxWidth: 384 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 26 }}>
-          <img src={LOGO} alt="CAD Venezuela" style={{ height: 56, display: "block" }} />
+          <img src={LOGO_CAD_VENEZUELA} alt="CAD Venezuela" style={{ height: 72, display: "block" }} />
           <div style={{ fontSize: 12, color: C.mut, textAlign: "center" }}>Tesorería &amp; Proyección de Pagos</div>
           <img src={LOGO_MAIZALITO} alt="El Maizalito" style={{ height: 22, display: "block", marginTop: 2 }} />
         </div>

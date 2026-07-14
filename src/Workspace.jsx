@@ -8,7 +8,8 @@ import {
   LogOut, 
   Menu, 
   X,
-  FileBarChart
+  FileBarChart,
+  Landmark
 } from "lucide-react";
 
 // Contexto de Autenticación
@@ -34,6 +35,7 @@ import Compromisos from "./views/Compras/Compromisos";
 import ModuloTesoreria from "./views/Tesoreria/ModuloTesoreria";
 import ModuloAjustes from "./views/Ajustes/ModuloAjustes";
 import ReporteMensual from "./views/Reportes/ReporteMensual";
+import ModuloBanco from "./views/Banco/ModuloBanco";
 
 export default function Workspace({ st, act }) {
   const { user, role, signOut } = useAuth();
@@ -106,6 +108,13 @@ export default function Workspace({ st, act }) {
             {(role === "TESORERIA" || role === "MASTER") && (
               <SidebarItem act={modulo === "reportes"} onClick={() => ir("reportes")}>
                 <FileBarChart size={16} /> Reportes
+              </SidebarItem>
+            )}
+
+            {/* Banco: movimientos y conciliación — Tesorería y Gerencia (Master) */}
+            {(role === "TESORERIA" || role === "MASTER") && (
+              <SidebarItem act={modulo === "banco"} onClick={() => ir("banco")}>
+                <Landmark size={16} /> Banco
               </SidebarItem>
             )}
 
@@ -194,6 +203,9 @@ export default function Workspace({ st, act }) {
           )}
           {modulo === "reportes" && (role === "TESORERIA" || role === "MASTER") && (
             <ReporteMensual st={st} />
+          )}
+          {modulo === "banco" && (role === "TESORERIA" || role === "MASTER") && (
+            <ModuloBanco st={st} act={act} rol={role} usuario={user?.email} />
           )}
           {modulo === "ajustes" && (
             <ModuloAjustes st={st} act={act} rol={role} meId={user?.id} />

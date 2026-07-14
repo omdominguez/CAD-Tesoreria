@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { Plus, Trash2, Pencil, Landmark } from "lucide-react";
+import { Plus, Trash2, Pencil, Landmark, ArrowUpRight, ArrowDownLeft, History } from "lucide-react";
 
 // Lógica y Tema
-import { money } from "../../utils/finance";
+import { C, FONTS } from "../../constants/theme";
+import { money, fmtD, construirLedgerBanco } from "../../utils/finance";
+import { AvatarBanco } from "../../components/shared/AvatarBanco";
 
 // Componentes UI
 import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
@@ -12,8 +14,8 @@ import { Th, Td } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Data";
 
 export default function Bancos({ st, act }) {
-  // Manejaremos el estado del modal con un objeto para saber si estamos editando o creando
   const [modalData, setModalData] = useState(null); // null = cerrado, { type: 'new' | 'edit', data: obj }
+  const [verMovimientos, setVerMovimientos] = useState(null); // id del banco a ver, o null
 
   const bancos = st.bancos || [];
 
@@ -39,46 +41,43 @@ export default function Bancos({ st, act }) {
           } 
         />
       ) : (
-        <Card>
-          <div className="cad-table-scroll" style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <Th>Banco</Th>
-                  <Th>Cuenta</Th>
-                  <Th>Tipo</Th>
-                  <Th>Moneda</Th>
-                  <Th right>Saldo actual</Th>
-                  <Th right>Acciones</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {bancos.map((b) => (
-                  <tr key={b.id}>
-                    <Td bold>{b.nombre}</Td>
-                    <Td>{b.numeroCuenta || "—"}</Td>
-                    <Td>{b.tipoCuenta}</Td>
-                    <Td><Badge tone="mut">{b.moneda}</Badge></Td>
-                    <Td right bold>{money(b.saldoActual, b.moneda)}</Td>
-                    <Td right>
-                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                        <Btn small variant="ghost" onClick={() => setModalData({ type: "edit", data: b })}>
-                          <Pencil size={13} />
-                        </Btn>
-                        <Btn small variant="danger" onClick={() => act.delBanco(b.id)}>
-                          <Trash2 size={13} />
-                        </Btn>
-                      </div>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+          {bancos.map((b) => (
+            <Card key={b.id} style={{ padding: 18 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+                <AvatarBanco nombre={b.nombre} tamano={40} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14.5, color: C.ink }}>{b.nombre}</div>
+                  <div style={{ fontSize: 11.5, color: C.mut }}>{b.tipoCuenta} · {b.numeroCuenta || "sin número"}</div>
+                </div>
+                <Badge tone="mut">{b.moneda}</Badge>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 3 }}>
+                  Saldo actual
+                </div>
+                <div style={{ fontFamily: FONTS.SANS, fontSize: 22, fontWeight: 800, color: C.ink, letterSpacing: -0.4 }}>
+                  {money(b.saldoActual, b.moneda)}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 6 }}>
+                <Btn small variant="ghost" style={{ flex: 1 }} onClick={() => setVerMovimientos(b.id)}>
+                  <History size={13} /> Movimientos
+                </Btn>
+                <Btn small variant="ghost" onClick={() => setModalData({ type: "edit", data: b })}>
+                  <Pencil size={13} />
+                </Btn>
+                <Btn small variant="danger" onClick={() => act.delBanco(b.id)}>
+                  <Trash2 size={13} />
+                </Btn>
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
-      {/* Renderizado Aislado del Modal */}
       {modalData && (
         <BancoModal 
           initialData={modalData.data} 
@@ -89,15 +88,85 @@ export default function Bancos({ st, act }) {
           }}
         />
       )}
+
+      {verMovimientos && (
+        <MovimientosBancoModal
+          st={st}
+          banco={bancos.find((b) => b.id === verMovimientos)}
+          onClose={() => setVerMovimientos(null)}
+        />
+      )}
     </Section>
   );
 }
 
+/* ============================================================
+   COMPONENTE AISLADO: MOVIMIENTOS DE UNA CUENTA (solo lectura)
+   ------------------------------------------------------------
+   Misma lógica de ledger que el Libro de Bancos en Tesorería —
+   esto es una vista rápida sin salir de Ajustes.
+   ============================================================ */
+function MovimientosBancoModal({ st, banco, onClose }) {
+  const historial = construirLedgerBanco(st, banco?.id);
+
+  return (
+    <Modal title={`Movimientos · ${banco?.nombre || ""}`} wide onClose={onClose}>
+      {historial.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "30px 10px", color: C.mut, fontSize: 13.5 }}>
+          Esta cuenta no registra movimientos todavía.
+        </div>
+      ) : (
+        <div className="cad-table-scroll" style={{ overflowX: "auto", border: `1px solid ${C.line}`, borderRadius: 12 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <Th>Fecha</Th>
+                <Th>Concepto</Th>
+                <Th right>Egreso</Th>
+                <Th right>Ingreso</Th>
+                <Th right>Saldo</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {historial.map((r) => (
+                <tr key={r.id}>
+                  <Td>{fmtD(r.fecha)}</Td>
+                  <Td>
+                    <div style={{ fontWeight: 700, color: C.ink }}>{r.concepto}</div>
+                    <div style={{ fontSize: 11.5, color: C.mut }}>{r.detalle}</div>
+                  </Td>
+                  <Td right>
+                    {r.tipo === "DEBITO" ? (
+                      <span style={{ color: C.rojo, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        <ArrowUpRight size={12} /> {money(r.monto, banco?.moneda)}
+                      </span>
+                    ) : "—"}
+                  </Td>
+                  <Td right>
+                    {r.tipo === "CREDITO" ? (
+                      <span style={{ color: C.verde, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        <ArrowDownLeft size={12} /> {money(r.monto, banco?.moneda)}
+                      </span>
+                    ) : "—"}
+                  </Td>
+                  <Td right bold style={{ fontVariantNumeric: "tabular-nums" }}>
+                    {money(r.saldoProgresivo, banco?.moneda)}
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+        <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
+      </div>
+    </Modal>
+  );
+}
 
 /* ============================================================
    COMPONENTE AISLADO: FORMULARIO DE BANCO
-   Esto evita que la tabla principal sufra re-renderizados (lag)
-   al escribir en los inputs.
    ============================================================ */
 function BancoModal({ initialData, onClose, onSave }) {
   const [f, setF] = useState(initialData || { 

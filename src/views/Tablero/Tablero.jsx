@@ -44,7 +44,7 @@ import { Section, Card, Empty } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
 import { Badge } from "../../components/ui/Data";
 import VariacionMensualBCV from "./VariacionMensualBCV";
-import { logosDeBanco } from "../../utils/bancoLogos";
+import { AvatarBanco } from "../../components/shared/AvatarBanco";
 
 /* ============================================================
    Franja de KPIs: una sola tarjeta dividida por líneas finas,
@@ -86,35 +86,7 @@ function KpiStrip({ items }) {
   );
 }
 
-/** Avatar circular del banco: Clearbit → favicon de Google → iniciales. */
-/** Avatar circular del banco: recorre la cadena completa de fuentes de logo → iniciales. */
-function AvatarBanco({ nombre }) {
-  const candidatos = logosDeBanco(nombre);
-  const [indice, setIndice] = useState(0);
-  const iniciales = (nombre || "??").trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 
-  const logoUrl = indice < candidatos.length ? candidatos[indice] : null;
-
-  if (logoUrl) {
-    return (
-      <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fff", border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
-        <img
-          key={logoUrl}
-          src={logoUrl}
-          alt=""
-          onError={() => setIndice((i) => i + 1)}
-          style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ width: 36, height: 36, borderRadius: 10, background: C.greenSoft, color: C.greenDk, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
-      {iniciales}
-    </div>
-  );
-}
 
 /** Tarjeta individual de banco (en vez de fila de tabla). */
 function TarjetaBanco({ b, st }) {

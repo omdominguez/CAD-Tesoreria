@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CreditCard, Building2, Banknote, Lock, Globe2, MapPin, Coins } from "lucide-react";
+import { CreditCard, Building2, Banknote, Lock, Globe2, MapPin, Coins, Layers, ChevronDown, Pencil } from "lucide-react";
 
 // Tema y utilidades
 import { C, TIPOS_MOV } from "../../constants/theme";
@@ -13,7 +13,9 @@ import {
   tasaSegunFormaPago,
   bancosProv,
   cuentaProvPorId,
-  resumenCuenta
+  resumenCuenta,
+  agruparYColapsarCompromisos,
+  bancosOrdenados
 } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
 
@@ -22,15 +24,19 @@ import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
 import { Btn, Segmented } from "../../components/ui/Buttons";
 import { Th, Td, Pagination } from "../../components/ui/Table";
 import { Field, Input, Select } from "../../components/ui/Forms";
+import { ComboBox } from "../../components/ui/ComboBox";
 import { Badge } from "../../components/ui/Data";
 
 // Componentes Compartidos
 import { AdjuntosInput } from "../../components/shared/Adjuntos";
+import { CorregirFechasModal } from "../../components/shared/CorregirFechasModal";
 
 export default function CuentasPorPagar({ st, act, rol }) {
   const [modal, setModal] = useState(null); // 'asig', 'mov', null
   const [f, setF] = useState({}); // Datos mínimos compartidos para levantar los formularios aislados
   const [filtro, setFiltro] = useState("PENDIENTES");
+  const [gruposExpandidos, setGruposExpandidos] = useState(new Set());
+  const [corregirFechasGid, setCorregirFechasGid] = useState(null);
 
   const puedeTeso = rol === "TESORERIA" || rol === "MASTER";
 
@@ -41,13 +47,17 @@ export default function CuentasPorPagar({ st, act, rol }) {
   };
 
   // Filtrado y ordenamiento cronológico
-  const lista = (st.compromisos || []).filter((c) => {
+  const listaBase = (st.compromisos || []).filter((c) => {
     if (c.anulado) return false;
     if (filtro === "PENDIENTES") return pendienteDe(st, c) > 0.005;
     if (filtro === "SIN_BANCO") return pendienteDe(st, c) > 0.005 && !c.bancoAsignadoId;
     if (filtro === "PAGADOS") return estadoDe(st, c) === "PAGADO";
     return true;
   }).sort((a, b) => (a.fechaVencimiento || "").localeCompare(b.fechaVencimiento || ""));
+
+  // Agrupamos por financiamiento y colapsamos las cuotas lejanas — misma
+  // lógica que usa Compras (utils/finance.js)
+  const lista = agruparYColapsarCompromisos(st, listaBase, gruposExpandidos);
 
   const pg = usePaged(lista, 10);
 
@@ -59,7 +69,8 @@ export default function CuentasPorPagar({ st, act, rol }) {
   const abrirPago = (c) => {
     const formaPago = c.formaPago || c.moneda || "USD"; // compatibilidad con pedidos antiguos
     const pendienteUSD = pendienteDe(st, c); // los pedidos siempre se registran en USD
-    const tasaAplicable = tasaSegunFormaPago(st, formaPago); // null si es USD directo
+    const hoy = new Date().toISOString().slice(0, 10);
+    const tasaAplicable = tasaSegunFormaPagoEnFecha(st, formaPago, hoy); // null si es USD directo
     const esEnBs = tasaAplicable !== null;
     const etiquetaTasa = { BS_BCV: "BCV ($)", BS_PARALELO: "Paralelo", BS_BCV_EUR: "BCV (€)", BS: "BCV ($)" }[formaPago] || "";
     const proveedor = (st.proveedores || []).find((p) => p.id === c.proveedorId);
@@ -68,6 +79,9 @@ export default function CuentasPorPagar({ st, act, rol }) {
     setF({ 
       compromisoId: c.id, 
       tipo: "TRANSFERENCIA", 
+      fecha: hoy,
+      formaPago,
+      pendienteUSD,
       monto: esEnBs ? Number((pendienteUSD * tasaAplicable).toFixed(2)) : pendienteUSD, 
       moneda: esEnBs ? "BS" : "USD", 
       tasaBcvPago: esEnBs ? tasaAplicable : null,
@@ -117,7 +131,33 @@ export default function CuentasPorPagar({ st, act, rol }) {
                 </tr>
               </thead>
               <tbody>
-                {pg.slice.map((c) => {
+                {pg.slice.map((item) => {
+                  if (item.tipo === "resumen") {
+                    return (
+                      <tr key={"resumen-" + item.gid} style={{ background: C.body }}>
+                        <td colSpan={7} style={{ padding: "10px 14px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <button
+                              onClick={() => setGruposExpandidos((prev) => new Set(prev).add(item.gid))}
+                              style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, color: C.mut, fontSize: 12.5, fontWeight: 600, padding: 0, flex: 1, textAlign: "left" }}
+                            >
+                              <Layers size={14} />
+                              Ver las {item.cantidad} cuota(s) restante(s) de "{item.descripcionBase}"
+                              {item.siguienteFecha && <span style={{ color: C.mut2 }}>· la siguiente vence {fmtD(item.siguienteFecha)}</span>}
+                              <ChevronDown size={14} />
+                            </button>
+                            {rol === "MASTER" && (
+                              <Btn small variant="ghost" onClick={() => setCorregirFechasGid(item.gid)}>
+                                <Pencil size={13} /> Corregir fechas
+                              </Btn>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  const c = item.c;
                   const e = estadoDe(st, c); 
                   const tone = e === "PAGADO" ? "verde" : e === "PARCIAL" ? "amar" : "gold";
                   const isEnCorrida = bloqueado(c);
@@ -203,6 +243,16 @@ export default function CuentasPorPagar({ st, act, rol }) {
           }} 
         />
       )}
+
+      {corregirFechasGid && (
+        <CorregirFechasModal
+          onClose={() => setCorregirFechasGid(null)}
+          onSave={(fechaInicio, frecuencia) => {
+            act.recalcularFechasGrupo(corregirFechasGid, fechaInicio, frecuencia);
+            setCorregirFechasGid(null);
+          }}
+        />
+      )}
     </Section>
   );
 }
@@ -222,17 +272,22 @@ function AsignarBancoModal({ st, initialData, onClose, onSave }) {
       </div>
 
       <Field label="Cuenta del proveedor a la que se pagará (destino)">
-        <Select value={f.cuentaDestinoId} onChange={(e) => setF({ ...f, cuentaDestinoId: e.target.value })}>
-          <option value="">Sin asignar</option>
-          {cuentasProveedor.map((cta) => (
-            <option key={cta.id} value={cta.id}>
-              {cta.tipo === "CRIPTO" ? "🪙 " : cta.tipo === "INTERNACIONAL" ? "🌐 " : "🏠 "}
-              {cta.tipo === "CRIPTO"
-                ? `${cta.moneda} (${cta.red}) — ${(cta.walletAddress || "").slice(0, 8)}…`
-                : `${cta.banco} — ${cta.tipo === "INTERNACIONAL" ? `SWIFT ${cta.swift || "—"}` : cta.cuenta} (${cta.moneda})`}
-            </option>
-          ))}
-        </Select>
+        <ComboBox
+          value={f.cuentaDestinoId}
+          onChange={(v) => setF({ ...f, cuentaDestinoId: v })}
+          placeholder="Sin asignar"
+          options={[...cuentasProveedor]
+            .sort((a, b) => (a.banco || a.moneda || "").localeCompare(b.banco || b.moneda || "", "es"))
+            .map((cta) => ({
+              value: cta.id,
+              label: cta.tipo === "CRIPTO"
+                ? `${cta.tipo === "CRIPTO" ? "🪙 " : ""}${cta.moneda} (${cta.red})`
+                : `${cta.tipo === "INTERNACIONAL" ? "🌐 " : "🏠 "}${cta.banco}`,
+              sublabel: cta.tipo === "CRIPTO"
+                ? (cta.walletAddress || "").slice(0, 14) + "…"
+                : `${cta.tipo === "INTERNACIONAL" ? `SWIFT ${cta.swift || "—"}` : cta.cuenta} (${cta.moneda})`
+            }))}
+        />
         {cuentasProveedor.length === 0 && (
           <div style={{ fontSize: 11.5, color: C.rojo, marginTop: 6 }}>
             Este proveedor no tiene cuentas bancarias registradas — agrégalas en Ajustes → Contactos.
@@ -241,12 +296,12 @@ function AsignarBancoModal({ st, initialData, onClose, onSave }) {
       </Field>
 
       <Field label="Banco de CAD con el que se pagará (origen)">
-        <Select value={f.bancoAsignadoId} onChange={(e) => setF({ ...f, bancoAsignadoId: e.target.value })}>
-          <option value="">Sin asignar</option>
-          {(st.bancos || []).map((b) => (
-            <option key={b.id} value={b.id}>{b.nombre} ({b.moneda})</option>
-          ))}
-        </Select>
+        <ComboBox
+          value={f.bancoAsignadoId}
+          onChange={(v) => setF({ ...f, bancoAsignadoId: v })}
+          placeholder="Sin asignar"
+          options={bancosOrdenados(st).map((b) => ({ value: b.id, label: b.nombre, sublabel: b.moneda }))}
+        />
       </Field>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
         <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
@@ -261,6 +316,21 @@ function AsignarBancoModal({ st, initialData, onClose, onSave }) {
    ============================================================ */
 function PagarProveedorModal({ st, initialData, onClose, onSave }) {
   const [f, setF] = useState({ ...initialData });
+
+  // Si la fecha cambia (por ejemplo, se está registrando con atraso un pago
+  // de hace unos días), recalculamos la tasa según lo que había vigente ESE
+  // día en el historial — no la de hoy.
+  const tasaVigenteEnFecha = f.formaPago && f.formaPago !== "USD"
+    ? tasaSegunFormaPagoEnFecha(st, f.formaPago, f.fecha)
+    : null;
+
+  const cambiarFecha = (nuevaFecha) => {
+    if (!tasaVigenteEnFecha) { setF({ ...f, fecha: nuevaFecha }); return; }
+    const nuevaTasa = tasaSegunFormaPagoEnFecha(st, f.formaPago, nuevaFecha);
+    // Solo re-sugerimos el monto si no lo habían tocado a mano de forma distinta al cálculo original
+    const montoRecalculado = f.pendienteUSD != null ? Number((f.pendienteUSD * nuevaTasa).toFixed(2)) : f.monto;
+    setF({ ...f, fecha: nuevaFecha, tasaBcvPago: nuevaTasa, monto: montoRecalculado });
+  };
 
   const guardar = () => {
     if (!(Number(f.monto) > 0)) return;
@@ -307,8 +377,8 @@ function PagarProveedorModal({ st, initialData, onClose, onSave }) {
 
       {f.tasaBcvPago && (
         <div style={{ background: C.greenSoft, color: C.greenDk, padding: "9px 12px", borderRadius: 10, fontSize: 12, marginBottom: 14 }}>
-          Este pedido se paga en Bs — el monto se calculó con la tasa {f.etiquetaTasa || "vigente"} de hoy (<b>{money(f.tasaBcvPago, "BS").replace("Bs", "Bs.")}</b> por USD).
-          Si la tasa cambió desde que abriste esta pantalla, ajusta el monto manualmente.
+          Este pedido se paga en Bs — el monto se calculó con la tasa {f.etiquetaTasa || "vigente"} del <b>{fmtD(f.fecha)}</b> (<b>{money(f.tasaBcvPago, "BS").replace("Bs", "Bs.")}</b> por USD).
+          Si cambias la fecha abajo, la tasa se recalcula sola.
         </div>
       )}
 
@@ -318,6 +388,12 @@ function PagarProveedorModal({ st, initialData, onClose, onSave }) {
             {TIPOS_MOV.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </Select>
         </Field>
+        <Field label="Fecha del pago">
+          <Input type="date" value={f.fecha} onChange={(e) => cambiarFecha(e.target.value)} />
+        </Field>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label={`Monto a transferir (${f.moneda === "BS" ? "Bs" : "USD"})`}>
           <Input type="number" value={f.monto} onChange={(e) => setF({ ...f, monto: e.target.value })} />
         </Field>
@@ -325,12 +401,12 @@ function PagarProveedorModal({ st, initialData, onClose, onSave }) {
       
       {f.tipo !== "CRUCE" && (
         <Field label="Salió del banco">
-          <Select value={f.bancoOrigenId} onChange={(e) => setF({ ...f, bancoOrigenId: e.target.value })}>
-            <option value="">—</option>
-            {(st.bancos || []).map((b) => (
-              <option key={b.id} value={b.id}>{b.nombre} ({b.moneda})</option>
-            ))}
-          </Select>
+          <ComboBox
+            value={f.bancoOrigenId}
+            onChange={(v) => setF({ ...f, bancoOrigenId: v })}
+            placeholder="Elegir banco..."
+            options={bancosOrdenados(st).map((b) => ({ value: b.id, label: b.nombre, sublabel: b.moneda }))}
+          />
         </Field>
       )}
       

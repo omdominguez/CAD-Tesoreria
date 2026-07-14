@@ -23,5 +23,31 @@ export function crearAccionesTasas(setSt, userId) {
         return next;
       });
     },
+    /**
+     * Agrega o corrige manualmente la "foto" de tasas de un día específico
+     * en el historial — útil para rellenar días en los que nadie abrió el
+     * sistema (y por lo tanto nunca se guardó su tasa), o para corregir un
+     * valor que quedó mal. Los pagos que se registren con esa fecha usarán
+     * automáticamente lo que se guarde aquí.
+     */
+    guardarTasaHistorica: (fecha, tasas) => {
+      setSt((prev) => {
+        const next = {
+          ...prev,
+          historialTasas: { ...(prev.historialTasas || {}), [fecha]: tasas }
+        };
+        saveState(next, userId).catch(console.error);
+        return next;
+      });
+    },
+    eliminarTasaHistorica: (fecha) => {
+      setSt((prev) => {
+        const historialTasas = { ...(prev.historialTasas || {}) };
+        delete historialTasas[fecha];
+        const next = { ...prev, historialTasas };
+        saveState(next, userId).catch(console.error);
+        return next;
+      });
+    },
   };
 }

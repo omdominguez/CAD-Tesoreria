@@ -3,18 +3,19 @@ import { Landmark, ArrowUpRight, ArrowDownLeft, Pencil, History } from "lucide-r
 
 // Subir 2 niveles para llegar a src/
 import { C, FONTS } from "../../constants/theme";
-import { money, fmtD, construirLedgerBanco } from "../../utils/finance";
+import { money, fmtD, construirLedgerBanco, bancosOrdenados } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
 
 // Componentes UI
 import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
 import { Th, Td, Pagination } from "../../components/ui/Table";
 import { Select, Input, Field } from "../../components/ui/Forms";
+import { ComboBox } from "../../components/ui/ComboBox";
 import { Btn } from "../../components/ui/Buttons";
 import { Badge } from "../../components/ui/Data";
 
 export default function LibroBancos({ st, act, rol, usuario }) {
-  const bancos = st.bancos || [];
+  const bancos = bancosOrdenados(st);
   const esMaster = rol === "MASTER";
   const [editando, setEditando] = useState(null); // id del movimiento en edición, o null
 
@@ -47,11 +48,12 @@ export default function LibroBancos({ st, act, rol, usuario }) {
       {/* Selector de cuenta y resumen rápido */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ minWidth: 240, flex: "0 1 350px" }}>
-          <Select value={bancoId} onChange={(e) => setBancoId(e.target.value)}>
-            {bancos.map((b) => (
-              <option key={b.id} value={b.id}>{b.nombre} ({b.moneda})</option>
-            ))}
-          </Select>
+          <ComboBox
+            value={bancoId}
+            onChange={setBancoId}
+            placeholder="Elegir cuenta..."
+            options={bancos.map((b) => ({ value: b.id, label: b.nombre, sublabel: b.moneda }))}
+          />
         </div>
 
         {bancoSel && (
@@ -193,11 +195,12 @@ function EditarMovimientoModal({ st, movimiento, onClose, onSave }) {
         <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
       </Field>
       <Field label="Banco de origen">
-        <Select value={bancoOrigenId} onChange={(e) => setBancoOrigenId(e.target.value)}>
-          {(st.bancos || []).map((b) => (
-            <option key={b.id} value={b.id}>{b.nombre} ({b.moneda})</option>
-          ))}
-        </Select>
+        <ComboBox
+          value={bancoOrigenId}
+          onChange={setBancoOrigenId}
+          placeholder="Elegir banco..."
+          options={bancosOrdenados(st).map((b) => ({ value: b.id, label: b.nombre, sublabel: b.moneda }))}
+        />
       </Field>
       <Field label="Referencia">
         <Input value={referencia} onChange={(e) => setReferencia(e.target.value)} />

@@ -1,4 +1,4 @@
-import { provNom, tasaDe, tasaCxC } from "./finance";
+import { provNom, tasaDe, cobranzaAUsd } from "./finance";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -37,8 +37,8 @@ export function generarReporteMensual(st, anio, mes) {
 
   const totalCompras = compromisosDelMes.reduce((a, c) => a + (c.moneda === "USD" ? Number(c.montoOriginal) : Number(c.montoOriginal) / tasaDe(st, c)), 0);
   const totalPagos = movimientosDelMes.reduce((a, m) => a + movimientoAUsd(m), 0);
-  const totalVentas = cxcDelMes.reduce((a, c) => a + (c.moneda === "USD" ? Number(c.montoOriginal) : Number(c.montoOriginal) / tasaCxC(st, c)), 0);
-  const totalCobros = cobranzasDelMes.reduce((a, c) => a + (c.moneda === "USD" ? Number(c.monto) : Number(c.monto) / (Number(st.config.tasaBCV) || 1)), 0);
+  const totalVentas = cxcDelMes.reduce((a, c) => a + Number(c.montoOriginal), 0);
+  const totalCobros = cobranzasDelMes.reduce((a, c) => a + cobranzaAUsd(c), 0);
 
   // Desglose de compras por categoría
   const porCategoriaMap = {};
@@ -68,8 +68,7 @@ export function generarReporteMensual(st, anio, mes) {
   const porClienteMap = {};
   cobranzasDelMes.forEach((c) => {
     const nombre = provNom(st, c.clienteId);
-    const usd = c.moneda === "USD" ? Number(c.monto) : Number(c.monto) / (Number(st.config.tasaBCV) || 1);
-    porClienteMap[nombre] = (porClienteMap[nombre] || 0) + usd;
+    porClienteMap[nombre] = (porClienteMap[nombre] || 0) + cobranzaAUsd(c);
   });
   const topClientes = Object.entries(porClienteMap)
     .map(([nombre, totalUSD]) => ({ nombre, totalUSD }))

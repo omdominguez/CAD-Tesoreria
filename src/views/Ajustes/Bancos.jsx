@@ -3,7 +3,7 @@ import { Plus, Trash2, Pencil, Landmark, ArrowUpRight, ArrowDownLeft, History } 
 
 // Lógica y Tema
 import { C, FONTS } from "../../constants/theme";
-import { money, fmtD, construirLedgerBanco } from "../../utils/finance";
+import { money, fmtD, construirLedgerBanco, bancosOrdenados } from "../../utils/finance";
 import { AvatarBanco } from "../../components/shared/AvatarBanco";
 
 // Componentes UI
@@ -17,7 +17,7 @@ export default function Bancos({ st, act }) {
   const [modalData, setModalData] = useState(null); // null = cerrado, { type: 'new' | 'edit', data: obj }
   const [verMovimientos, setVerMovimientos] = useState(null); // id del banco a ver, o null
 
-  const bancos = st.bancos || [];
+  const bancos = bancosOrdenados(st);
 
   return (
     <Section 

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Landmark, ArrowUpRight, ArrowDownLeft, CheckCircle2, Circle, ClipboardCheck, Plus, Trash2, Search } from "lucide-react";
 
 import { C, FONTS } from "../../constants/theme";
-import { money, fmtD, construirLedgerBanco } from "../../utils/finance";
+import { money, fmtD, construirLedgerBanco, bancosOrdenados } from "../../utils/finance";
 import { exportarCSV, exportarExcel, exportarPDF } from "../../utils/exportar";
 import { usePaged } from "../../hooks/usePaged";
 
@@ -10,6 +10,7 @@ import { AvatarBanco } from "../../components/shared/AvatarBanco";
 import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
 import { Th, Td, Pagination } from "../../components/ui/Table";
 import { Select, Input, Field } from "../../components/ui/Forms";
+import { ComboBox } from "../../components/ui/ComboBox";
 import { Btn, Segmented } from "../../components/ui/Buttons";
 import { Badge } from "../../components/ui/Data";
 import { ExportMenu } from "../../components/ui/ExportMenu";
@@ -17,7 +18,7 @@ import { ExportMenu } from "../../components/ui/ExportMenu";
 const hoyStr = () => new Date().toISOString().slice(0, 10);
 
 export default function ModuloBanco({ st, act, rol, usuario }) {
-  const bancos = st.bancos || [];
+  const bancos = bancosOrdenados(st);
   const puedeConciliar = rol === "TESORERIA" || rol === "MASTER";
 
   const [bancoId, setBancoId] = useState(bancos[0]?.id || "");
@@ -114,11 +115,12 @@ export default function ModuloBanco({ st, act, rol, usuario }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 260 }}>
           <AvatarBanco nombre={bancoSel?.nombre} tamano={34} />
-          <Select value={bancoId} onChange={(e) => { setBancoId(e.target.value); setSeleccion([]); }} style={{ marginBottom: 0 }}>
-            {bancos.map((b) => (
-              <option key={b.id} value={b.id}>{b.nombre} ({b.moneda})</option>
-            ))}
-          </Select>
+          <ComboBox
+            value={bancoId}
+            onChange={(v) => { setBancoId(v); setSeleccion([]); }}
+            placeholder="Elegir cuenta..."
+            options={bancos.map((b) => ({ value: b.id, label: b.nombre, sublabel: b.moneda }))}
+          />
         </div>
         <Segmented
           value={tab}

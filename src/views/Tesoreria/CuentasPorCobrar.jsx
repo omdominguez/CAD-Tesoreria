@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Trash2, Receipt } from "lucide-react";
+import { Plus, Trash2, Receipt, Users, ChevronDown, ChevronUp } from "lucide-react";
 
 // Tema y utilidades
 import { C } from "../../constants/theme";
@@ -10,7 +10,9 @@ import {
   fmtD, 
   money, 
   cobradoDeCxC, 
-  pendienteCxC 
+  pendienteCxC,
+  pendienteCli,
+  FORMAS_PAGO
 } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
 
@@ -19,6 +21,7 @@ import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
 import { Btn, Segmented } from "../../components/ui/Buttons";
 import { Th, Td, Pagination } from "../../components/ui/Table";
 import { Field, Input, Select } from "../../components/ui/Forms";
+import { ComboBox } from "../../components/ui/ComboBox";
 import { Badge } from "../../components/ui/Data";
 import { AdjuntarPdfOdoo } from "../../components/shared/AdjuntarPdfOdoo";
 
@@ -26,6 +29,7 @@ export default function CuentasPorCobrar({ st, act, rol }) {
   // modalOpen: controla el despliegue del modal aislado
   const [modalOpen, setModalOpen] = useState(false);
   const [filtro, setFiltro] = useState("TODOS");
+  const [verResumenCliente, setVerResumenCliente] = useState(true);
 
   const puedeCrear = rol === "MASTER" || rol === "TESORERIA";
   const clientes = (st.proveedores || []).filter(esCli);
@@ -42,6 +46,17 @@ export default function CuentasPorCobrar({ st, act, rol }) {
     
   const pg = usePaged(lista, 10);
 
+  // Resumen global: cuánto nos deben en total, y desglosado por cliente
+  const activas = (st.cuentasCobrar || []).filter((c) => !c.anulado && estadoCxC(st, c) !== "COBRADO");
+  const totalPorCobrar = activas.reduce((a, c) => a + pendienteCxC(st, c), 0);
+  const hoy = new Date().toISOString().slice(0, 10);
+  const vencidas = activas.filter((c) => (c.fechaVencimiento || "") < hoy);
+
+  const resumenPorCliente = clientes
+    .map((cli) => ({ cliente: cli, pendiente: pendienteCli(st, cli.id), cantidad: activas.filter((c) => c.clienteId === cli.id).length }))
+    .filter((r) => r.pendiente > 0.005)
+    .sort((a, b) => b.pendiente - a.pendiente);
+
   return (
     <Section 
       title="Cuentas por Cobrar (Ventas)" 
@@ -54,6 +69,61 @@ export default function CuentasPorCobrar({ st, act, rol }) {
         )
       }
     >
+      {/* KPIs globales */}
+      <Card style={{ padding: 0, marginBottom: 16, overflow: "hidden" }}>
+        <div style={{ display: "flex", flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 180px", padding: "14px 18px", borderRight: `1px solid ${C.line}` }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: C.mut, textTransform: "uppercase" }}>Total por cobrar</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.verde, marginTop: 4 }}>{money(totalPorCobrar, "USD")}</div>
+          </div>
+          <div style={{ flex: "1 1 180px", padding: "14px 18px", borderRight: `1px solid ${C.line}` }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: C.mut, textTransform: "uppercase" }}>Facturas activas</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: C.ink, marginTop: 4 }}>{activas.length}</div>
+          </div>
+          <div style={{ flex: "1 1 180px", padding: "14px 18px" }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: C.mut, textTransform: "uppercase" }}>Vencidas</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: vencidas.length > 0 ? C.rojo : C.ink, marginTop: 4 }}>{vencidas.length}</div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Resumen por cliente — desglose de "nos debe" sin salir de Tesorería */}
+      {resumenPorCliente.length > 0 && (
+        <Card style={{ padding: 0, marginBottom: 16, overflow: "hidden" }}>
+          <button
+            onClick={() => setVerResumenCliente((v) => !v)}
+            style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", cursor: "pointer", padding: "12px 16px" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, color: C.ink }}>
+              <Users size={14} /> Resumen por cliente ({resumenPorCliente.length})
+            </div>
+            {verResumenCliente ? <ChevronUp size={16} color={C.mut} /> : <ChevronDown size={16} color={C.mut} />}
+          </button>
+          {verResumenCliente && (
+            <div style={{ borderTop: `1px solid ${C.line}` }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <Th>Cliente</Th>
+                    <Th right>Facturas pendientes</Th>
+                    <Th right>Total nos debe</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumenPorCliente.map((r) => (
+                    <tr key={r.cliente.id}>
+                      <Td bold>{r.cliente.razonSocial}</Td>
+                      <Td right>{r.cantidad}</Td>
+                      <Td right bold style={{ color: C.verde }}>{money(r.pendiente, "USD")}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
+
       <div style={{ marginBottom: 12 }}>
         <Segmented 
           value={filtro} 
@@ -173,6 +243,7 @@ function FacturaModal({ clientes, act, onClose, onSave }) {
     descripcion: "", 
     montoOriginal: "", 
     moneda: "USD", 
+    formaPago: "USD",
     fechaEmision: new Date().toISOString().slice(0, 10), 
     fechaVencimiento: new Date().toISOString().slice(0, 10) 
   });
@@ -182,7 +253,7 @@ function FacturaModal({ clientes, act, onClose, onSave }) {
       ...prev,
       numeroFactura: datos.numeroDocumento || prev.numeroFactura,
       montoOriginal: datos.monto != null ? String(datos.monto) : prev.montoOriginal,
-      moneda: datos.moneda || prev.moneda,
+      formaPago: datos.moneda === "BS" ? "BS_BCV" : (datos.moneda || prev.formaPago),
       descripcion: datos.descripcionSugerida || prev.descripcion,
       fechaEmision: datos.fecha || prev.fechaEmision,
       clienteId: contacto ? contacto.id : prev.clienteId
@@ -206,7 +277,7 @@ function FacturaModal({ clientes, act, onClose, onSave }) {
 
   const guardar = () => {
     if (!f.clienteId || !f.montoOriginal) return;
-    onSave({ ...f, montoOriginal: Number(f.montoOriginal) });
+    onSave({ ...f, montoOriginal: Number(f.montoOriginal), moneda: "USD" });
   };
 
   return (
@@ -230,12 +301,15 @@ function FacturaModal({ clientes, act, onClose, onSave }) {
       )}
 
       <Field label="Cliente">
-        <Select value={f.clienteId} onChange={(e) => setF({ ...f, clienteId: e.target.value })}>
-          {clientesLocal.length === 0 && <option value="">— Sin clientes registrados —</option>}
-          {clientesLocal.map((p) => (
-            <option key={p.id} value={p.id}>{p.razonSocial}</option>
-          ))}
-        </Select>
+        <ComboBox
+          value={f.clienteId}
+          onChange={(v) => setF({ ...f, clienteId: v })}
+          placeholder={clientesLocal.length === 0 ? "Sin clientes registrados" : "Buscar cliente..."}
+          disabled={clientesLocal.length === 0}
+          options={[...clientesLocal]
+            .sort((a, b) => (a.razonSocial || "").localeCompare(b.razonSocial || "", "es"))
+            .map((p) => ({ value: p.id, label: p.razonSocial }))}
+        />
       </Field>
       
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
@@ -269,17 +343,16 @@ function FacturaModal({ clientes, act, onClose, onSave }) {
       </Field>
       
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Monto total">
+        <Field label="Monto total (siempre en USD)">
           <Input 
             type="number" 
             value={f.montoOriginal} 
             onChange={(e) => setF({ ...f, montoOriginal: e.target.value })} 
           />
         </Field>
-        <Field label="Moneda">
-          <Select value={f.moneda} onChange={(e) => setF({ ...f, moneda: e.target.value })}>
-            <option value="BS">Bs</option>
-            <option value="USD">USD</option>
+        <Field label="Forma de pago esperada">
+          <Select value={f.formaPago} onChange={(e) => setF({ ...f, formaPago: e.target.value })}>
+            {FORMAS_PAGO.map((fp) => <option key={fp.id} value={fp.id}>{fp.label}</option>)}
           </Select>
         </Field>
       </div>

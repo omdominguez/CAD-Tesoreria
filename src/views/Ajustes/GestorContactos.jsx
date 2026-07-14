@@ -3,7 +3,7 @@ import { Plus, Trash2, Pencil, Users, X, Globe2, MapPin, Coins } from "lucide-re
 
 // Tema y Utilidades
 import { C } from "../../constants/theme";
-import { esProv, esCli, bancosProv } from "../../utils/finance";
+import { esProv, esCli, bancosProv, contactosOrdenados } from "../../utils/finance";
 
 // Componentes UI
 import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
@@ -34,7 +34,7 @@ export default function GestorContactos({ st, act }) {
   const [filtro, setFiltro] = useState("TODOS");
 
   // Filtrado de la lista según el tab seleccionado
-  const lista = (st.proveedores || []).filter((p) => {
+  const lista = contactosOrdenados(st).filter((p) => {
     if (filtro === "PROVEEDORES" && !esProv(p)) return false;
     if (filtro === "CLIENTES" && !esCli(p)) return false;
     return true;

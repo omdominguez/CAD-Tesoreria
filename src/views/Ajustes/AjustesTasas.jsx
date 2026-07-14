@@ -6,16 +6,21 @@ import { nf, hoyStr } from "../../utils/finance";
 import { fetchTasaBCV, fetchTasaParalelo, fetchSugerenciaIntervencion, fetchTasasBDV } from "../../utils/tasasExternas";
 
 // Componentes UI
-import { Section, Card } from "../../components/ui/Layout";
+import { Section, Card, Modal, Empty } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
-import { RefreshCw } from "lucide-react";
+import { Field, Input } from "../../components/ui/Forms";
+import { Th, Td } from "../../components/ui/Table";
+import { RefreshCw, History, Plus, Pencil, Trash2, CalendarClock } from "lucide-react";
 
 export default function AjustesTasas({ st, act }) {
   const [sincronizando, setSincronizando] = useState(false);
   const [resultado, setResultado] = useState(null); // texto del último intento manual
   const [sugerenciaInterv, setSugerenciaInterv] = useState(null); // promedio sugerido (no aplicado solo)
+  const [modalHistorial, setModalHistorial] = useState(null); // null | "new" | fecha a editar
 
   // Definición de las tasas que queremos manejar y sus colores asociados
+  const historialOrdenado = Object.entries(st.historialTasas || {}).sort((a, b) => b[0].localeCompare(a[0]));
+
   const rates = [
     { k: "tasaBCV", lbl: "BCV (oficial, USD)", tone: C.green, auto: true },
     { k: "tasaIntervencion", lbl: "Intervención", tone: C.gold, auto: false },
@@ -138,6 +143,129 @@ export default function AjustesTasas({ st, act }) {
         que publique exactamente ese dato — al actualizar verás una sugerencia calculada (promedio
         entre BCV y Paralelo) que puedes aceptar con un clic o ignorar y seguir con tu propio número.
       </div>
+
+      {/* Historial de tasas por día */}
+      <div style={{ marginTop: 32, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <History size={16} color={C.mut} />
+          <h3 style={{ fontFamily: FONTS.SANS, fontSize: 15, fontWeight: 800, color: C.ink, margin: 0 }}>Historial de tasas por día</h3>
+        </div>
+        <Btn small onClick={() => setModalHistorial("new")}>
+          <Plus size={13} /> Agregar tasa de un día
+        </Btn>
+      </div>
+
+      <div style={{ fontSize: 12, color: C.mut, marginBottom: 12, maxWidth: 640 }}>
+        Cuando registras un pago con una fecha pasada, el sistema busca aquí la tasa que estaba
+        vigente ese día. Si nadie abrió el sistema ese día, no queda foto guardada — aquí puedes
+        rellenarla a mano para que los pagos atrasados usen la tasa correcta en vez de la de hoy.
+      </div>
+
+      {historialOrdenado.length === 0 ? (
+        <Empty icon={CalendarClock} title="Sin historial todavía" msg="Se va guardando solo cada día que alguien abre el sistema." />
+      ) : (
+        <Card>
+          <div className="cad-table-scroll" style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <Th>Fecha</Th>
+                  <Th right>BCV</Th>
+                  <Th right>Intervención</Th>
+                  <Th right>Paralelo</Th>
+                  <Th right>BCV Euro</Th>
+                  <Th right>Acciones</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {historialOrdenado.map(([fecha, tasas]) => (
+                  <tr key={fecha}>
+                    <Td bold>{fecha}</Td>
+                    <Td right>{nf.format(Number(tasas.tasaBCV) || 0)}</Td>
+                    <Td right>{nf.format(Number(tasas.tasaIntervencion) || 0)}</Td>
+                    <Td right>{nf.format(Number(tasas.tasaParalelo) || 0)}</Td>
+                    <Td right>{nf.format(Number(tasas.tasaBcvEuro) || 0)}</Td>
+                    <Td right>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        <Btn small variant="ghost" onClick={() => setModalHistorial(fecha)}>
+                          <Pencil size={13} />
+                        </Btn>
+                        <Btn small variant="danger" onClick={() => act.eliminarTasaHistorica(fecha)}>
+                          <Trash2 size={13} />
+                        </Btn>
+                      </div>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {modalHistorial && (
+        <TasaHistoricaModal
+          fechaInicial={modalHistorial === "new" ? hoy : modalHistorial}
+          datosIniciales={modalHistorial !== "new" ? st.historialTasas[modalHistorial] : null}
+          fechasExistentes={Object.keys(st.historialTasas || {})}
+          onClose={() => setModalHistorial(null)}
+          onSave={(fecha, tasas) => { act.guardarTasaHistorica(fecha, tasas); setModalHistorial(null); }}
+        />
+      )}
     </Section>
+  );
+}
+
+/* ============================================================
+   MODAL: AGREGAR / EDITAR LA TASA DE UN DÍA ESPECÍFICO
+   ============================================================ */
+function TasaHistoricaModal({ fechaInicial, datosIniciales, fechasExistentes, onClose, onSave }) {
+  const [fecha, setFecha] = useState(fechaInicial);
+  const [tasas, setTasas] = useState(datosIniciales || { tasaBCV: "", tasaIntervencion: "", tasaParalelo: "", tasaBcvEuro: "" });
+
+  const esEdicion = !!datosIniciales;
+  const fechaYaExiste = !esEdicion && fechasExistentes.includes(fecha);
+
+  const guardar = () => {
+    if (!fecha) return;
+    onSave(fecha, {
+      tasaBCV: Number(tasas.tasaBCV) || 0,
+      tasaIntervencion: Number(tasas.tasaIntervencion) || 0,
+      tasaParalelo: Number(tasas.tasaParalelo) || 0,
+      tasaBcvEuro: Number(tasas.tasaBcvEuro) || 0
+    });
+  };
+
+  return (
+    <Modal title={esEdicion ? `Editar tasas del ${fecha}` : "Agregar tasa de un día"} onClose={onClose}>
+      <Field label="Fecha">
+        <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} disabled={esEdicion} />
+      </Field>
+      {fechaYaExiste && (
+        <div style={{ fontSize: 11.5, color: C.rojo, marginTop: -8, marginBottom: 12 }}>
+          Ya existe una tasa guardada para ese día — si guardas, se reemplaza.
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="BCV (oficial, USD)">
+          <Input type="number" value={tasas.tasaBCV} onChange={(e) => setTasas({ ...tasas, tasaBCV: e.target.value })} />
+        </Field>
+        <Field label="Intervención">
+          <Input type="number" value={tasas.tasaIntervencion} onChange={(e) => setTasas({ ...tasas, tasaIntervencion: e.target.value })} />
+        </Field>
+        <Field label="Mercado paralelo">
+          <Input type="number" value={tasas.tasaParalelo} onChange={(e) => setTasas({ ...tasas, tasaParalelo: e.target.value })} />
+        </Field>
+        <Field label="BCV (Euro)">
+          <Input type="number" value={tasas.tasaBcvEuro} onChange={(e) => setTasas({ ...tasas, tasaBcvEuro: e.target.value })} />
+        </Field>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
+        <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+        <Btn onClick={guardar}>Guardar</Btn>
+      </div>
+    </Modal>
   );
 }

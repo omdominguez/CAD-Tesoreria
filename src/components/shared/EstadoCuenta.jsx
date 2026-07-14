@@ -146,7 +146,16 @@ export function EstadoCuenta({ rows, nombreContacto = "cuenta", etiquetaCargo = 
                     </Td>
                     <Td right>{r.cargo > 0 ? money(r.cargo, r.moneda) : "—"}</Td>
                     <Td right>
-                      {r.abono > 0 ? <span style={{ color: C.verde }}>{money(r.abono, r.moneda)}</span> : "—"}
+                      {r.abono > 0 ? (
+                        <div>
+                          <span style={{ color: C.verde }}>{money(r.abono, r.moneda)}</span>
+                          {r.moneda !== "USD" && r.tasa && (
+                            <div style={{ fontSize: 10.5, color: C.mut, fontWeight: 500 }}>
+                              tasa {r.tasa} → {money(-r.usd, "USD")}
+                            </div>
+                          )}
+                        </div>
+                      ) : "—"}
                     </Td>
                     <Td right bold>
                       <span style={{ color: r.saldo > 0.005 ? C.rojo : C.verde }}>{money(r.saldo, "USD")}</span>

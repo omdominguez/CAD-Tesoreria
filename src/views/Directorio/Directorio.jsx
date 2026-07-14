@@ -3,7 +3,7 @@ import { Search, Users, FileText } from "lucide-react";
 
 // Utilidades y Tema
 import { C } from "../../constants/theme";
-import { esProv, esCli, pendienteProv, pendienteCli, money } from "../../utils/finance";
+import { esProv, esCli, pendienteProv, pendienteCli, money, contactosOrdenados } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
 
 // Componentes UI
@@ -22,7 +22,7 @@ export default function Directorio({ st }) {
   const [q, setQ] = useState("");
   
   // Lógica de filtrado y búsqueda
-  const base = (st.proveedores || []).filter((p) => {
+  const base = contactosOrdenados(st).filter((p) => {
     if (filtro === "PROVEEDORES" && !esProv(p)) return false;
     if (filtro === "CLIENTES" && !esCli(p)) return false;
     

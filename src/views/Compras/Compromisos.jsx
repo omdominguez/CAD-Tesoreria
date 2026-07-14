@@ -1,5 +1,5 @@
 import React, { useState, Fragment } from "react";
-import { FileText, CalendarClock, CalendarDays, Plus, Paperclip, Trash2, ChevronDown, Layers } from "lucide-react";
+import { FileText, CalendarClock, CalendarDays, Plus, Paperclip, Trash2, ChevronDown, Layers, Pencil } from "lucide-react";
 
 // Tema y Finanzas
 import { C } from "../../constants/theme";
@@ -11,7 +11,8 @@ import {
   money, 
   pagadoDe, 
   pendienteDe, 
-  movsDe 
+  movsDe,
+  agruparYColapsarCompromisos
 } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
 
@@ -23,16 +24,14 @@ import { Badge } from "../../components/ui/Data";
 
 // Componentes Compartidos y Subvistas
 import { AdjuntoChip, AdjuntosInput } from "../../components/shared/Adjuntos";
+import { CorregirFechasModal } from "../../components/shared/CorregirFechasModal";
 import AgendaPagos from "./AgendaPagos";
 import CalendarioPagos from "./CalendarioPagos";
 import KpiCompras from "./KpiCompras";
 import FormCompromiso from "./FormCompromiso";
 
-const hoyStr = () => new Date().toISOString().slice(0, 10);
-
-// Cuántas cuotas PENDIENTES próximas (aún no vencidas) se muestran de una vez,
-// antes de colapsar el resto detrás de un botón "Ver las N restantes".
-const PROXIMAS_VISIBLES = 2;
+// Cuántas cuotas PENDIENTES próximas (aún no vencidas) se muestran de una vez
+// antes de colapsar el resto — el valor real vive en agruparYColapsarCompromisos.
 
 export default function Compromisos({ st, act, rol }) {
   const [modal, setModal] = useState(null); // 'new', 'adj', null
@@ -40,6 +39,7 @@ export default function Compromisos({ st, act, rol }) {
   const [filtro, setFiltro] = useState("TODOS");
   const [vista, setVista] = useState("lista");
   const [gruposExpandidos, setGruposExpandidos] = useState(new Set());
+  const [corregirFechasGid, setCorregirFechasGid] = useState(null);
   
   const puedeCrear = rol === "COMPRAS" || rol === "MASTER";
   const proveedores = (st.proveedores || []).filter(esProv);
@@ -54,44 +54,9 @@ export default function Compromisos({ st, act, rol }) {
     .filter((c) => !c.anulado && pasa(c))
     .sort((a, b) => (a.fechaVencimiento || "").localeCompare(b.fechaVencimiento || ""));
 
-  // Agrupamos por financiamiento (grupoFinanciamientoId) y, dentro de cada
-  // grupo, solo mostramos de entrada: las vencidas, las ya pagadas, y las
-  // próximas N por vencer — el resto queda detrás de "Ver las N restantes".
-  const hoy = hoyStr();
-  const gruposMap = {};
-  listaBase.forEach((c) => {
-    const gid = c.grupoFinanciamientoId || c.id; // sin grupo = grupo de 1
-    if (!gruposMap[gid]) gruposMap[gid] = [];
-    gruposMap[gid].push(c);
-  });
-
-  const lista = [];
-  Object.entries(gruposMap).forEach(([gid, items]) => {
-    if (items.length === 1 || gruposExpandidos.has(gid)) {
-      items.forEach((c) => lista.push({ tipo: "fila", c }));
-      return;
-    }
-
-    const vencidasOPagadas = [];
-    const proximasPendientes = [];
-    items.forEach((c) => {
-      const e = estadoDe(st, c);
-      const vencida = e !== "PAGADO" && (c.fechaVencimiento || "") < hoy;
-      if (e === "PAGADO" || e === "PARCIAL" || vencida) vencidasOPagadas.push(c);
-      else proximasPendientes.push(c);
-    });
-
-    const visiblesExtra = proximasPendientes.slice(0, PROXIMAS_VISIBLES);
-    const ocultas = proximasPendientes.slice(PROXIMAS_VISIBLES);
-
-    [...vencidasOPagadas, ...visiblesExtra]
-      .sort((a, b) => (a.fechaVencimiento || "").localeCompare(b.fechaVencimiento || ""))
-      .forEach((c) => lista.push({ tipo: "fila", c }));
-
-    if (ocultas.length > 0) {
-      lista.push({ tipo: "resumen", gid, cantidad: ocultas.length, siguienteFecha: ocultas[0]?.fechaVencimiento, descripcionBase: items[0].descripcion.replace(/\s*\(.*?\)\s*$/, "") });
-    }
-  });
+  // Agrupamos por financiamiento y colapsamos las cuotas lejanas — misma
+  // lógica que usa Cuentas por Pagar en Tesorería (utils/finance.js)
+  const lista = agruparYColapsarCompromisos(st, listaBase, gruposExpandidos);
 
   const pg = usePaged(lista, 10);
 
@@ -186,15 +151,22 @@ export default function Compromisos({ st, act, rol }) {
                         return (
                           <tr key={"resumen-" + item.gid} style={{ background: C.body }}>
                             <td colSpan={8} style={{ padding: "10px 14px" }}>
-                              <button
-                                onClick={() => setGruposExpandidos((prev) => new Set(prev).add(item.gid))}
-                                style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, color: C.mut, fontSize: 12.5, fontWeight: 600, padding: 0, width: "100%", textAlign: "left" }}
-                              >
-                                <Layers size={14} />
-                                Ver las {item.cantidad} cuota(s) restante(s) de "{item.descripcionBase}"
-                                {item.siguienteFecha && <span style={{ color: C.mut2 }}>· la siguiente vence {fmtD(item.siguienteFecha)}</span>}
-                                <ChevronDown size={14} style={{ marginLeft: "auto" }} />
-                              </button>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <button
+                                  onClick={() => setGruposExpandidos((prev) => new Set(prev).add(item.gid))}
+                                  style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, color: C.mut, fontSize: 12.5, fontWeight: 600, padding: 0, flex: 1, textAlign: "left" }}
+                                >
+                                  <Layers size={14} />
+                                  Ver las {item.cantidad} cuota(s) restante(s) de "{item.descripcionBase}"
+                                  {item.siguienteFecha && <span style={{ color: C.mut2 }}>· la siguiente vence {fmtD(item.siguienteFecha)}</span>}
+                                  <ChevronDown size={14} />
+                                </button>
+                                {rol === "MASTER" && (
+                                  <Btn small variant="ghost" onClick={() => setCorregirFechasGid(item.gid)}>
+                                    <Pencil size={13} /> Corregir fechas
+                                  </Btn>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -314,6 +286,16 @@ export default function Compromisos({ st, act, rol }) {
             </Btn>
           </div>
         </Modal>
+      )}
+
+      {corregirFechasGid && (
+        <CorregirFechasModal
+          onClose={() => setCorregirFechasGid(null)}
+          onSave={(fechaInicio, frecuencia) => {
+            act.recalcularFechasGrupo(corregirFechasGid, fechaInicio, frecuencia);
+            setCorregirFechasGid(null);
+          }}
+        />
       )}
     </Section>
   );

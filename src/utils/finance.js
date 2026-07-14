@@ -211,7 +211,78 @@ export function construirLedgerBanco(st, bancoId) {
 
   return rowsConSaldo.reverse();
 }
+
+/**
+ * Agrupa una lista de compromisos por financiamiento (grupoFinanciamientoId)
+ * y, dentro de cada grupo con más de un compromiso, solo deja "visibles" las
+ * vencidas, las pagadas/parciales, y las próximas N por vencer — el resto se
+ * resume en una sola fila expandible. Se usa tanto en Compras como en
+ * Cuentas por Pagar (Tesorería), para no repetir esta lógica dos veces.
+ *
+ * @returns array de { tipo: "fila", c } | { tipo: "resumen", gid, cantidad, siguienteFecha, descripcionBase }
+ */
+export function agruparYColapsarCompromisos(st, listaBase, gruposExpandidos, proximasVisibles = 2) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const gruposMap = {};
+  listaBase.forEach((c) => {
+    const gid = c.grupoFinanciamientoId || c.id; // sin grupo = grupo de 1
+    if (!gruposMap[gid]) gruposMap[gid] = [];
+    gruposMap[gid].push(c);
+  });
+
+  const resultado = [];
+  Object.entries(gruposMap).forEach(([gid, items]) => {
+    if (items.length === 1 || gruposExpandidos.has(gid)) {
+      items.forEach((c) => resultado.push({ tipo: "fila", c }));
+      return;
+    }
+
+    const vencidasOPagadas = [];
+    const proximasPendientes = [];
+    items.forEach((c) => {
+      const e = estadoDe(st, c);
+      const vencida = e !== "PAGADO" && (c.fechaVencimiento || "") < hoy;
+      if (e === "PAGADO" || e === "PARCIAL" || vencida) vencidasOPagadas.push(c);
+      else proximasPendientes.push(c);
+    });
+
+    const visiblesExtra = proximasPendientes.slice(0, proximasVisibles);
+    const ocultas = proximasPendientes.slice(proximasVisibles);
+
+    [...vencidasOPagadas, ...visiblesExtra]
+      .sort((a, b) => (a.fechaVencimiento || "").localeCompare(b.fechaVencimiento || ""))
+      .forEach((c) => resultado.push({ tipo: "fila", c }));
+
+    if (ocultas.length > 0) {
+      resultado.push({
+        tipo: "resumen",
+        gid,
+        cantidad: ocultas.length,
+        siguienteFecha: ocultas[0]?.fechaVencimiento,
+        descripcionBase: (items[0].descripcion || "").replace(/\s*\(.*?\)\s*$/, "")
+      });
+    }
+  });
+
+  return resultado;
+}
+
 export const cuentaProvPorId = (p, cuentaId) => bancosProv(p).find((b) => b.id === cuentaId) || null;
+
+/** Compara dos textos alfabéticamente respetando tildes/ñ del español. */
+const compararEs = (a, b) => (a || "").localeCompare(b || "", "es", { sensitivity: "base" });
+
+/** Bancos propios de CAD, ordenados alfabéticamente por nombre. */
+export const bancosOrdenados = (st) => [...(st.bancos || [])].sort((a, b) => compararEs(a.nombre, b.nombre));
+
+/** Todo el directorio de contactos, ordenado alfabéticamente por razón social. */
+export const contactosOrdenados = (st) => [...(st.proveedores || [])].sort((a, b) => compararEs(a.razonSocial, b.razonSocial));
+
+/** Solo los que son proveedores, ordenados alfabéticamente. */
+export const proveedoresOrdenados = (st) => (st.proveedores || []).filter(esProv).sort((a, b) => compararEs(a.razonSocial, b.razonSocial));
+
+/** Solo los que son clientes, ordenados alfabéticamente. */
+export const clientesOrdenados = (st) => (st.proveedores || []).filter(esCli).sort((a, b) => compararEs(a.razonSocial, b.razonSocial));
 
 /** Texto corto para mostrar una cuenta bancaria de proveedor (banco + últimos dígitos, SWIFT si es internacional, o wallet si es cripto). */
 export function resumenCuenta(cta) {
@@ -307,7 +378,18 @@ export const pagadoProv = (st, pid) => pedidosProv(st, pid).reduce((a, c) => a +
    ============================================================ */
 export const cxcDeCli = (st, cid) => (st.cuentasCobrar || []).filter((c) => c.clienteId === cid && !c.anulado);
 export const cobrosDeCxC = (st, cxcId) => (st.cobranzas || []).filter((c) => c.cuentaCobrarId === cxcId);
-export const cobradoDeCxC = (st, cxcId) => cobrosDeCxC(st, cxcId).reduce((a, c) => a + Number(c.monto), 0);
+
+/** Convierte un cobro a su equivalente en USD, usando la tasa que quedó registrada en ese cobro (no la de la factura). */
+export const cobranzaAUsd = (c) => {
+  if (!c.moneda || c.moneda === "USD") return Number(c.monto);
+  const tasa = Number(c.tasaBcvPago) || 1;
+  return Number(c.monto) / tasa;
+};
+
+// Las facturas (CxC) siempre se registran en USD — cobradoDeCxC ya devuelve
+// el equivalente en USD de cada cobro, sin importar en qué moneda haya
+// pagado el cliente ese día en particular.
+export const cobradoDeCxC = (st, cxcId) => cobrosDeCxC(st, cxcId).reduce((a, c) => a + cobranzaAUsd(c), 0);
 export const pendienteCxC = (st, cxc) => Math.max(0, Number(cxc.montoOriginal) - cobradoDeCxC(st, cxc.id));
 
 export function estadoCxC(st, c) {
@@ -320,9 +402,10 @@ export function estadoCxC(st, c) {
 
 export const activoCxC = (st, c) => !c.anulado && ["PENDIENTE", "PARCIAL"].includes(estadoCxC(st, c));
 
-export const tasaCxC = (st, c) => Number(c.tasaBcvRegistro || st.config.tasaBCV) || 1;
-export const usdCxCPendiente = (st, c) => c.moneda === "USD" ? pendienteCxC(st, c) : pendienteCxC(st, c) / tasaCxC(st, c);
-export const usdCxCCobrado = (st, c) => c.moneda === "USD" ? cobradoDeCxC(st, c.id) : cobradoDeCxC(st, c.id) / tasaCxC(st, c);
+// La factura ya vive en USD, así que estos dos ya no necesitan conversión —
+// se mantienen con el mismo nombre por compatibilidad con quien los use.
+export const usdCxCPendiente = (st, c) => pendienteCxC(st, c);
+export const usdCxCCobrado = (st, c) => cobradoDeCxC(st, c.id);
 
 export const pendienteCli = (st, cid) => cxcDeCli(st, cid).reduce((a, c) => a + usdCxCPendiente(st, c), 0);
 export const cobradoCli = (st, cid) => cxcDeCli(st, cid).reduce((a, c) => a + usdCxCCobrado(st, c), 0);
@@ -369,9 +452,10 @@ export function ledgerProv(st, p) {
       usd: c.moneda === "USD" ? Number(c.montoOriginal) : Number(c.montoOriginal) / t 
     });
     
-    // Abono (Lo que le pagamos)
+    // Abono (Lo que le pagamos) — usa la tasa que quedó registrada en ESE pago
     movsDe(st, c.id).forEach((m) => {
-      const mu = m.moneda === "USD" ? Number(m.monto) : Number(m.monto) / t;
+      const tasaPago = m.moneda === "USD" ? null : (Number(m.tasaBcvPago) || t);
+      const mu = m.moneda === "USD" ? Number(m.monto) : Number(m.monto) / tasaPago;
       rows.push({ 
         fecha: m.fecha, 
         tipo: m.tipo === "CRUCE" ? "Cruce" : "Pago", 
@@ -381,6 +465,7 @@ export function ledgerProv(st, p) {
         moneda: m.moneda, 
         cargo: 0, 
         abono: Number(m.monto), 
+        tasa: tasaPago,
         usd: -mu 
       });
     });
@@ -400,9 +485,8 @@ export function ledgerProv(st, p) {
 export function ledgerCli(st, p) {
   const rows = [];
   
-  // Cargo (Lo que el cliente nos debe / Factura emitida)
+  // Cargo (Lo que el cliente nos debe / Factura emitida) — siempre en USD
   cxcDeCli(st, p.id).forEach((c) => {
-    const t = tasaCxC(st, c);
     rows.push({ 
       fecha: c.fechaEmision || c.fechaVencimiento, 
       tipo: "Factura", 
@@ -412,17 +496,14 @@ export function ledgerCli(st, p) {
       moneda: c.moneda, 
       cargo: Number(c.montoOriginal), 
       abono: 0, 
-      usd: c.moneda === "USD" ? Number(c.montoOriginal) : Number(c.montoOriginal) / t 
+      usd: Number(c.montoOriginal)
     });
   });
   
-  // Abono (Lo que el cliente nos paga)
+  // Abono (Lo que el cliente nos paga) — convertido con la tasa de ESE cobro
   (st.cobranzas || []).filter((c) => c.clienteId === p.id).forEach((m) => {
-    // Busca si este cobro está atado a una factura específica para usar su tasa histórica
     const facRelacionada = m.cuentaCobrarId ? (st.cuentasCobrar || []).find(f => f.id === m.cuentaCobrarId) : null;
-    const t = facRelacionada ? tasaCxC(st, facRelacionada) : (Number(st.config.tasaBCV) || 1);
-    
-    const mu = m.moneda === "USD" ? Number(m.monto) : Number(m.monto) / t;
+    const mu = cobranzaAUsd(m);
     
     rows.push({ 
       fecha: m.fecha, 
@@ -433,6 +514,7 @@ export function ledgerCli(st, p) {
       moneda: m.moneda, 
       cargo: 0, 
       abono: Number(m.monto), 
+      tasa: m.moneda === "USD" ? null : (Number(m.tasaBcvPago) || null),
       usd: -mu 
     });
   });

@@ -8,6 +8,7 @@ import { money, FORMAS_PAGO } from "../../utils/finance";
 // Componentes UI
 import { Modal } from "../../components/ui/Layout";
 import { Field, Input, Select } from "../../components/ui/Forms";
+import { ComboBox } from "../../components/ui/ComboBox";
 import { Btn } from "../../components/ui/Buttons";
 import { AdjuntosInput } from "../../components/shared/Adjuntos";
 import { AdjuntarPdfOdoo } from "../../components/shared/AdjuntarPdfOdoo";
@@ -168,11 +169,14 @@ export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
       )}
 
       <Field label="Proveedor">
-        <Select value={f.proveedorId} onChange={(e) => setF({ ...f, proveedorId: e.target.value })}>
-          {proveedoresLocal.map((p) => (
-            <option key={p.id} value={p.id}>{p.razonSocial}</option>
-          ))}
-        </Select>
+        <ComboBox
+          value={f.proveedorId}
+          onChange={(v) => setF({ ...f, proveedorId: v })}
+          placeholder="Buscar proveedor..."
+          options={[...proveedoresLocal]
+            .sort((a, b) => (a.razonSocial || "").localeCompare(b.razonSocial || "", "es"))
+            .map((p) => ({ value: p.id, label: p.razonSocial, sublabel: p.rif }))}
+        />
       </Field>
       
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>

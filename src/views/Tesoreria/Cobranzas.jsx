@@ -10,7 +10,10 @@ import {
   bancoNom, 
   money, 
   activoCxC, 
-  pendienteCxC 
+  pendienteCxC,
+  cobranzaAUsd,
+  tasaSegunFormaPago,
+  FORMAS_PAGO
 } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
 import { uploadAdjunto } from "../../services/store";
@@ -20,6 +23,7 @@ import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
 import { Th, Td, Pagination } from "../../components/ui/Table";
 import { Field, Input, Select } from "../../components/ui/Forms";
+import { ComboBox } from "../../components/ui/ComboBox";
 import { AdjuntarComprobante } from "../../components/shared/AdjuntarComprobante";
 import { AdjuntoChip } from "../../components/shared/Adjuntos";
 
@@ -97,6 +101,11 @@ export default function Cobranzas({ st, act }) {
                       <Td>{bancoNom(st, c.bancoDestinoId)}</Td>
                       <Td right bold>
                         <span style={{ color: C.verde }}>+{money(c.monto, c.moneda)}</span>
+                        {c.moneda !== "USD" && (
+                          <div style={{ fontSize: 11, color: C.mut, fontWeight: 500 }}>
+                            ≈ {money(cobranzaAUsd(c), "USD")} {c.tasaBcvPago ? `· tasa ${c.tasaBcvPago}` : ""}
+                          </div>
+                        )}
                       </Td>
                       <Td right>
                         <Btn 
@@ -145,17 +154,23 @@ function CobranzaModal({ st, clientes, onClose, onSave }) {
     cuentaCobrarId: "", 
     descripcion: "", 
     monto: "", 
-    moneda: "USD", 
+    formaPago: "USD", 
     bancoDestinoId: "", 
     fecha: new Date().toISOString().slice(0, 10),
     adjuntos: []
   });
   const [subiendoComprobante, setSubiendoComprobante] = useState(false);
 
-  const bancosFiltrados = (st.bancos || []).filter((b) => b.moneda === f.moneda);
+  // La factura siempre vive en USD — la "forma de pago" es en qué moneda
+  // llegó realmente el dinero, y de ahí sale la tasa a usar hoy.
+  const tasaAplicable = tasaSegunFormaPago(st, f.formaPago); // null si es USD directo
+  const monedaPago = f.formaPago === "USD" ? "USD" : "BS";
+  const montoUSD = tasaAplicable && f.monto ? Number(f.monto) / tasaAplicable : Number(f.monto || 0);
+
+  const bancosFiltrados = (st.bancos || []).filter((b) => b.moneda === monedaPago);
   
   const cxcPendientes = f.clienteId 
-    ? (st.cuentasCobrar || []).filter((c) => c.clienteId === f.clienteId && c.moneda === f.moneda && activoCxC(st, c)) 
+    ? (st.cuentasCobrar || []).filter((c) => c.clienteId === f.clienteId && activoCxC(st, c)) 
     : [];
 
   // Se llama al terminar de leer el comprobante: pre-llena los campos Y
@@ -164,7 +179,7 @@ function CobranzaModal({ st, clientes, onClose, onSave }) {
     setF((prev) => ({
       ...prev,
       monto: datos.monto != null ? String(datos.monto) : prev.monto,
-      moneda: datos.moneda || prev.moneda,
+      formaPago: datos.moneda === "BS" ? "BS_BCV" : (datos.moneda || prev.formaPago),
       fecha: datos.fecha || prev.fecha,
       descripcion: datos.referencia ? `Ref. ${datos.referencia}` : prev.descripcion
     }));
@@ -179,9 +194,28 @@ function CobranzaModal({ st, clientes, onClose, onSave }) {
     setSubiendoComprobante(false);
   };
 
+  const elegirFactura = (facId) => {
+    const fac = cxcPendientes.find((x) => x.id === facId);
+    if (!fac) { setF({ ...f, cuentaCobrarId: "" }); return; }
+
+    // Si la factura tiene su propia forma de pago esperada, la usamos para
+    // sugerir el monto ya convertido; si no, se mantiene la que ya estaba elegida.
+    const formaPagoSugerida = fac.formaPago || f.formaPago;
+    const tasaSugerida = tasaSegunFormaPago(st, formaPagoSugerida);
+    const pendienteUSD = pendienteCxC(st, fac);
+    const montoSugerido = tasaSugerida ? Number((pendienteUSD * tasaSugerida).toFixed(2)) : pendienteUSD;
+
+    setF({ ...f, cuentaCobrarId: facId, formaPago: formaPagoSugerida, monto: String(montoSugerido), bancoDestinoId: "" });
+  };
+
   const guardar = () => {
     if (!f.clienteId || !f.monto || !f.bancoDestinoId) return;
-    onSave({ ...f, monto: Number(f.monto) });
+    onSave({ 
+      ...f, 
+      monto: Number(f.monto), 
+      moneda: monedaPago, 
+      tasaBcvPago: tasaAplicable 
+    });
   };
 
   return (
@@ -200,23 +234,23 @@ function CobranzaModal({ st, clientes, onClose, onSave }) {
       )}
 
       <Field label="Cliente">
-        <Select 
-          value={f.clienteId} 
-          onChange={(e) => setF({ ...f, clienteId: e.target.value, cuentaCobrarId: "" })}
-        >
-          {clientes.map((p) => <option key={p.id} value={p.id}>{p.razonSocial}</option>)}
-        </Select>
+        <ComboBox
+          value={f.clienteId}
+          onChange={(v) => setF({ ...f, clienteId: v, cuentaCobrarId: "" })}
+          placeholder="Buscar cliente..."
+          options={[...clientes]
+            .sort((a, b) => (a.razonSocial || "").localeCompare(b.razonSocial || "", "es"))
+            .map((p) => ({ value: p.id, label: p.razonSocial }))}
+        />
       </Field>
       
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Moneda del pago">
+        <Field label="Forma de pago" hint="¿En qué llegó el dinero?">
           <Select 
-            value={f.moneda} 
-            onChange={(e) => setF({ ...f, moneda: e.target.value, bancoDestinoId: "", cuentaCobrarId: "" })}
+            value={f.formaPago} 
+            onChange={(e) => setF({ ...f, formaPago: e.target.value, bancoDestinoId: "" })}
           >
-            <option value="USD">USD</option>
-            <option value="BS">Bs</option>
-            <option value="EUR">EUR</option>
+            {FORMAS_PAGO.map((fp) => <option key={fp.id} value={fp.id}>{fp.label}</option>)}
           </Select>
         </Field>
         <Field label="Fecha de pago">
@@ -232,28 +266,31 @@ function CobranzaModal({ st, clientes, onClose, onSave }) {
         <Field label="Aplicar a factura (opcional)">
           <Select 
             value={f.cuentaCobrarId} 
-            onChange={(e) => { 
-              const fac = cxcPendientes.find((x) => x.id === e.target.value); 
-              setF({ ...f, cuentaCobrarId: e.target.value, monto: fac ? pendienteCxC(st, fac) : f.monto }); 
-            }}
+            onChange={(e) => elegirFactura(e.target.value)}
           >
             <option value="">— Anticipo o libre —</option>
             {cxcPendientes.map((fac) => (
               <option key={fac.id} value={fac.id}>
-                Fac: {fac.numeroFactura || "S/N"} ({money(pendienteCxC(st, fac), fac.moneda)})
+                Fac: {fac.numeroFactura || "S/N"} ({money(pendienteCxC(st, fac), "USD")} pendiente)
               </option>
             ))}
           </Select>
         </Field>
       </div>
       
-      <Field label="Monto recibido">
+      <Field label={`Monto recibido (${monedaPago === "USD" ? "USD" : "Bs"})`}>
         <Input 
           type="number" 
           value={f.monto} 
           onChange={(e) => setF({ ...f, monto: e.target.value })} 
         />
       </Field>
+
+      {tasaAplicable && f.monto && (
+        <div style={{ background: C.body, padding: "8px 12px", borderRadius: 10, marginTop: -8, marginBottom: 14, fontSize: 12.5 }}>
+          Con tasa <b>{tasaAplicable}</b>, esto equivale a <b style={{ color: C.ink }}>{money(montoUSD, "USD")}</b> — con esto se cruzará contra la factura (que vive en USD).
+        </div>
+      )}
       
       <Field label="Descripción / Concepto">
         <Input 
@@ -265,19 +302,18 @@ function CobranzaModal({ st, clientes, onClose, onSave }) {
       
       <div style={{ borderTop: `1px dashed ${C.line}`, marginTop: 4, paddingTop: 12 }}>
         <Field label="Banco destino">
-          <Select 
-            value={f.bancoDestinoId} 
-            onChange={(e) => setF({ ...f, bancoDestinoId: e.target.value })}
-          >
-            <option value="">— Seleccionar banco —</option>
-            {bancosFiltrados.map((b) => (
-              <option key={b.id} value={b.id}>{b.nombre} ({b.moneda})</option>
-            ))}
-          </Select>
+          <ComboBox
+            value={f.bancoDestinoId}
+            onChange={(v) => setF({ ...f, bancoDestinoId: v })}
+            placeholder="Seleccionar banco..."
+            options={[...bancosFiltrados]
+              .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es"))
+              .map((b) => ({ value: b.id, label: b.nombre, sublabel: b.moneda }))}
+          />
         </Field>
         {bancosFiltrados.length === 0 && (
           <div style={{ fontSize: 12, color: C.rojo, marginTop: -8, marginBottom: 12 }}>
-            ⚠️ No hay bancos en {f.moneda}.
+            ⚠️ No hay bancos en {monedaPago}.
           </div>
         )}
       </div>

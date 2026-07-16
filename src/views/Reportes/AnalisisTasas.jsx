@@ -341,9 +341,7 @@ function TabEvolucion({ serie, keys }) {
             <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: C.mut }} tickFormatter={fmtFechaCorta} minTickGap={44} />
             <YAxis tick={{ fontSize: 10, fill: C.mut }} tickFormatter={(v) => nf.format(v)} width={56} />
             <Tooltip
-              contentStyle={tooltipStyle}
-              labelFormatter={(l) => new Date(l + "T00:00:00").toLocaleDateString("es-VE")}
-              formatter={(v, name) => [`Bs ${nf.format(v)}`, TASAS_META.find((t) => t.key === name)?.label || name]}
+              content={<TooltipEvolucionConBrecha keys={keys} />}
             />
             {keys.filter((k) => visibles.has(k)).map((k) => (
               <Line key={k} type="monotone" dataKey={k} stroke={colorDe(k)} strokeWidth={2} dot={false} connectNulls />
@@ -351,7 +349,53 @@ function TabEvolucion({ serie, keys }) {
           </LineChart>
         </ResponsiveContainer>
       </div>
+      <div style={{ fontSize: 11, color: C.mut2, marginTop: 8 }}>
+        Al pasar el mouse sobre una fecha, además del valor de cada tasa se muestra su brecha % contra BCV ($) ese mismo día.
+      </div>
     </Card>
+  );
+}
+
+/**
+ * Tooltip a medida para Evolución: además del valor en Bs de cada tasa
+ * visible, muestra su brecha % contra BCV ($) en esa misma fecha (BCV no
+ * lleva brecha, es la referencia). Así de un vistazo se ve el nivel y qué
+ * tan lejos está cada una del oficial ese día puntual.
+ */
+function TooltipEvolucionConBrecha({ active, payload, label, keys }) {
+  if (!active || !payload || !payload.length) return null;
+  const fila = payload[0].payload || {};
+  const bcv = fila.tasaBCV > 0 ? fila.tasaBCV : null;
+
+  // Mantiene el orden de TASAS_META, solo las que están visibles en el gráfico
+  const visiblesKeys = TASAS_META.map((t) => t.key).filter((k) => keys.includes(k) && payload.some((p) => p.dataKey === k));
+
+  return (
+    <div style={tooltipStyle}>
+      <div style={{ fontWeight: 700, marginBottom: 6, color: C.ink }}>
+        {new Date(label + "T00:00:00").toLocaleDateString("es-VE")}
+      </div>
+      {visiblesKeys.map((k) => {
+        const meta = TASAS_META.find((t) => t.key === k);
+        const valor = fila[k];
+        if (valor == null) return null;
+        const esBCV = k === "tasaBCV";
+        const brecha = !esBCV && bcv ? ((valor - bcv) / bcv) * 100 : null;
+        return (
+          <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 14, marginTop: 3 }}>
+            <span style={{ color: colorDe(k) }}>{meta?.label}</span>
+            <span style={{ display: "flex", gap: 8 }}>
+              <b style={{ color: C.ink }}>Bs {nf.format(valor)}</b>
+              {brecha !== null && (
+                <span style={{ color: brecha >= 0 ? C.rojo : C.verde, fontWeight: 600 }}>
+                  ({brecha >= 0 ? "+" : ""}{nf.format(brecha)}%)
+                </span>
+              )}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

@@ -3,17 +3,17 @@ import { Plus, X } from "lucide-react";
 
 // Tema y utilidades
 import { C, CLASIF } from "../../constants/theme";
-import { money, FORMAS_PAGO } from "../../utils/finance";
+import { money, FORMAS_PAGO, tasaSegunFormaPagoEnFecha } from "../../utils/finance";
 
 // Componentes UI
 import { Modal } from "../../components/ui/Layout";
 import { Field, Input, Select } from "../../components/ui/Forms";
 import { ComboBox } from "../../components/ui/ComboBox";
-import { Btn } from "../../components/ui/Buttons";
+import { Btn, Segmented } from "../../components/ui/Buttons";
 import { AdjuntosInput } from "../../components/shared/Adjuntos";
 import { AdjuntarPdfOdoo } from "../../components/shared/AdjuntarPdfOdoo";
 
-export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
+export default function FormCompromiso({ st, proveedores, act, onSave, onClose }) {
   // Copia local de proveedores para poder reflejar de inmediato uno recién creado
   // (mientras el resto de la app se sincroniza con Supabase de fondo).
   const [proveedoresLocal, setProveedoresLocal] = useState(proveedores);
@@ -31,10 +31,16 @@ export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
     fechaVencimiento: new Date().toISOString().slice(0, 10), 
     prioridad: "NORMAL", 
     enCuotas: false, 
+    modoCuotas: "IGUALES", // "IGUALES" | "PERSONALIZADO"
     numCuotas: 2, 
     frecuencia: "MENSUAL", 
     financiamientoPct: "", 
     iniciales: [], // [{ monto, fecha, pagada }] — uno o varios pagos iniciales
+    cuotasPersonalizadas: [], // [{ monto, fecha, pagada }] — plan de pago armado a mano
+    discriminarIva: false,
+    ivaPct: "16",
+    ivaFecha: new Date().toISOString().slice(0, 10), // vencimiento del IVA (se sincroniza con fechaPedido si no se toca a mano)
+    ivaPagada: false,
     adjuntos: [] 
   });
 
@@ -52,23 +58,60 @@ export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
     iniciales: (prev.iniciales || []).filter((_, j) => j !== i)
   }));
 
+  const addCuotaPersonalizada = () => setF((prev) => ({
+    ...prev,
+    cuotasPersonalizadas: [...(prev.cuotasPersonalizadas || []), { monto: "", fecha: prev.fechaVencimiento, pagada: false }]
+  }));
+  const setCuotaPersonalizada = (i, key, val) => setF((prev) => {
+    const cuotasPersonalizadas = [...(prev.cuotasPersonalizadas || [])];
+    cuotasPersonalizadas[i] = { ...cuotasPersonalizadas[i], [key]: val };
+    return { ...prev, cuotasPersonalizadas };
+  });
+  const delCuotaPersonalizada = (i) => setF((prev) => ({
+    ...prev,
+    cuotasPersonalizadas: (prev.cuotasPersonalizadas || []).filter((_, j) => j !== i)
+  }));
+
   // Cálculo en vivo para la vista previa (misma fórmula que al guardar)
   const sumaIniciales = (f.iniciales || []).reduce((a, x) => a + (Number(x.monto) || 0), 0);
   const saldoBase = Number(f.montoOriginal || 0) - sumaIniciales;
   const pctFinanciamiento = Number(f.financiamientoPct || 0);
   const saldoFinanciado = saldoBase * (1 + pctFinanciamiento / 100);
   const montoPorCuota = saldoFinanciado / (Number(f.numCuotas) || 1);
+  const sumaCuotasPersonalizadas = (f.cuotasPersonalizadas || []).reduce((a, x) => a + (Number(x.monto) || 0), 0);
+  const diferenciaPersonalizada = saldoFinanciado - sumaCuotasPersonalizadas;
+
+  // IVA: la base (montoOriginal) se paga en USD; el IVA siempre se paga en Bs,
+  // a la tasa BCV vigente EN LA FECHA DEL PEDIDO (no la de hoy) — igual que se
+  // hace con las cobranzas atrasadas, para que quede congelada la tasa correcta.
+  const ivaPct = Number(f.ivaPct || 0);
+  const baseUSD = Number(f.montoOriginal || 0);
+  const ivaUSD = baseUSD * (ivaPct / 100);
+  const tasaBCVPedido = st ? (tasaSegunFormaPagoEnFecha(st, "BS_BCV", f.fechaPedido) || 0) : 0;
+  const ivaBs = ivaUSD * tasaBCVPedido;
 
   // Se llama cuando el PDF adjunto termina de leerse y analizarse
   const onDatosDetectados = (datos, contacto) => {
+    // Si el pedido trae el resumen fiscal (Base imponible / Impuestos), se
+    // registra ya discriminado: la base como monto del pedido, y se activa
+    // el IVA con el % detectado — así casi nunca hay que tocarlo a mano.
+    const conDesglose = datos.baseImponible != null && datos.impuestos != null;
+
     setF((prev) => ({
       ...prev,
       numeroPedidoOdoo: datos.numeroDocumento || prev.numeroPedidoOdoo,
-      montoOriginal: datos.monto != null ? String(datos.monto) : prev.montoOriginal,
+      montoOriginal: conDesglose
+        ? String(datos.baseImponible)
+        : (datos.monto != null ? String(datos.monto) : prev.montoOriginal),
       // La moneda del pedido siempre es USD — no se sobreescribe con lo detectado en el PDF
       descripcion: datos.descripcionSugerida || prev.descripcion,
       fechaPedido: datos.fecha || prev.fechaPedido,
-      proveedorId: contacto ? contacto.id : prev.proveedorId
+      proveedorId: contacto ? contacto.id : prev.proveedorId,
+      ...(conDesglose ? {
+        discriminarIva: true,
+        ivaPct: String(datos.ivaPctDetectado ?? Math.round((datos.impuestos / datos.baseImponible) * 10000) / 100),
+        ivaFecha: datos.fecha || prev.ivaFecha
+      } : {})
     }));
 
     if (!contacto && datos.rif) {
@@ -85,6 +128,32 @@ export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
     setProveedoresLocal((prev) => [...prev, { id, rif: sugerenciaNueva.rif, razonSocial: sugerenciaNueva.nombre, esProveedor: true }]);
     setF((prev) => ({ ...prev, proveedorId: id }));
     setSugerenciaNueva(null);
+  };
+
+  // Compromiso del IVA (en Bs, tasa BCV congelada a la fecha del pedido) —
+  // se agrega SIEMPRE por separado del compromiso en USD, discriminado o no.
+  const compromisoIva = (grupoFinanciamientoId) => {
+    if (!f.discriminarIva || !(ivaBs > 0)) return null;
+    return {
+      data: {
+        ...f,
+        descripcion: `${f.descripcion} (IVA ${ivaPct}%)`,
+        montoOriginal: ivaBs,
+        moneda: "BS",
+        formaPago: "BS_BCV",
+        tasaBcvRegistro: tasaBCVPedido,
+        fechaVencimiento: f.ivaFecha || f.fechaPedido,
+        grupoFinanciamientoId: grupoFinanciamientoId || null
+      },
+      anticipo: f.ivaPagada ? {
+        monto: ivaBs,
+        moneda: "BS",
+        fecha: f.ivaFecha || f.fechaPedido,
+        tipo: "TRANSFERENCIA",
+        bancoOrigenId: null,
+        referencia: "Pago de IVA"
+      } : null
+    };
   };
 
   const guardarNuevo = () => {
@@ -121,30 +190,61 @@ export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
         });
       });
 
-      // 2. El saldo restante, con el % de financiamiento aplicado como recargo
-      //    de una sola vez sobre el saldo (no interés compuesto por cuota),
-      //    repartido en partes iguales entre las cuotas.
-      let d = new Date(f.fechaVencimiento + "T00:00:00");
-      for (let i = 1; i <= numCuotas; i++) {
-        listaCuotas.push({ 
-          data: { 
-            ...f, 
-            descripcion: `${f.descripcion} (Cuota ${i}/${numCuotas}${pctFinanciamiento > 0 ? ` · +${pctFinanciamiento}% financ.` : ""})`, 
-            montoOriginal: montoPorCuota, 
-            fechaVencimiento: d.toISOString().slice(0, 10),
-            grupoFinanciamientoId
-          }, 
-          anticipo: null 
+      // 2. El saldo restante: en modo "Iguales" se reparte en N cuotas del
+      //    mismo monto y frecuencia; en modo "Personalizado" se usa tal cual
+      //    el plan de pago armado a mano (cada fila, con su propio monto y
+      //    fecha, y si ya está pagada o no — igual que un pago inicial).
+      if (f.modoCuotas === "PERSONALIZADO") {
+        const totalCuotasPers = (f.cuotasPersonalizadas || []).length;
+        (f.cuotasPersonalizadas || []).forEach((c, idx) => {
+          if (!(Number(c.monto) > 0)) return;
+          listaCuotas.push({
+            data: {
+              ...f,
+              descripcion: `${f.descripcion} (Cuota ${idx + 1}/${totalCuotasPers})`,
+              montoOriginal: Number(c.monto),
+              fechaVencimiento: c.fecha || f.fechaVencimiento,
+              grupoFinanciamientoId
+            },
+            anticipo: c.pagada ? {
+              monto: Number(c.monto),
+              moneda: "USD",
+              fecha: c.fecha || f.fechaVencimiento,
+              tipo: "TRANSFERENCIA",
+              bancoOrigenId: null,
+              referencia: `Cuota ${idx + 1}`
+            } : null
+          });
         });
-        
-        if (f.frecuencia === "MENSUAL") d.setMonth(d.getMonth() + 1); 
-        else if (f.frecuencia === "QUINCENAL") d.setDate(d.getDate() + 15); 
-        else if (f.frecuencia === "SEMANAL") d.setDate(d.getDate() + 7);
+      } else {
+        let d = new Date(f.fechaVencimiento + "T00:00:00");
+        for (let i = 1; i <= numCuotas; i++) {
+          listaCuotas.push({ 
+            data: { 
+              ...f, 
+              descripcion: `${f.descripcion} (Cuota ${i}/${numCuotas}${pctFinanciamiento > 0 ? ` · +${pctFinanciamiento}% financ.` : ""})`, 
+              montoOriginal: montoPorCuota, 
+              fechaVencimiento: d.toISOString().slice(0, 10),
+              grupoFinanciamientoId
+            }, 
+            anticipo: null 
+          });
+          
+          if (f.frecuencia === "MENSUAL") d.setMonth(d.getMonth() + 1); 
+          else if (f.frecuencia === "QUINCENAL") d.setDate(d.getDate() + 15); 
+          else if (f.frecuencia === "SEMANAL") d.setDate(d.getDate() + 7);
+        }
       }
       
+      const civa = compromisoIva(grupoFinanciamientoId);
+      if (civa) listaCuotas.push(civa);
+
       onSave(listaCuotas);
     } else {
-      onSave([{ data: { ...f, montoOriginal: Number(f.montoOriginal) }, anticipo: null }]);
+      const lista = [{ data: { ...f, montoOriginal: Number(f.montoOriginal) }, anticipo: null }];
+      const civa = compromisoIva(null);
+      if (civa) lista.push(civa);
+      onSave(lista);
     }
   };
 
@@ -234,6 +334,61 @@ export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
         onChange={(a) => setF({ ...f, adjuntos: a })} 
         label="Orden de compra / cotización (PDF o imagen)" 
       />
+
+      <div style={{ borderTop: `1px dashed ${C.line}`, marginTop: 4, paddingTop: 14 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, fontWeight: 700, color: C.azul, cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={f.discriminarIva}
+            onChange={(e) => setF({ ...f, discriminarIva: e.target.checked, ivaFecha: f.ivaFecha || f.fechaPedido })}
+          />
+          Discriminar IVA (la base va en USD, el IVA siempre se paga en Bs)
+        </label>
+
+        {f.discriminarIva && (
+          <div style={{ marginTop: 12, padding: 14, background: C.azulSoft, borderRadius: 12, border: `1px solid ${C.azul}` }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Field label="% de IVA">
+                <Input
+                  type="number"
+                  value={f.ivaPct}
+                  onChange={(e) => setF({ ...f, ivaPct: e.target.value })}
+                />
+              </Field>
+              <Field label="Fecha de pago del IVA">
+                <Input
+                  type="date"
+                  value={f.ivaFecha}
+                  onChange={(e) => setF({ ...f, ivaFecha: e.target.value })}
+                />
+              </Field>
+            </div>
+
+            {tasaBCVPedido > 0 ? (
+              <>
+                <div style={{ fontSize: 12.5, color: C.ink, lineHeight: 1.6 }}>
+                  Base imponible: <b>{money(baseUSD, "USD")}</b> · IVA {ivaPct}%: <b>{money(ivaUSD, "USD")}</b>
+                  {" "}→ a la tasa BCV del {f.fechaPedido} (<b>Bs {tasaBCVPedido.toFixed(2)}</b>) = <b style={{ color: C.azul }}>{money(ivaBs, "BS")}</b>
+                </div>
+                <div style={{ fontSize: 11, color: C.mut, marginTop: 4 }}>
+                  El compromiso base queda en USD por {money(baseUSD, "USD")}. El IVA se registra como un compromiso
+                  aparte, en bolívares, a pagar en Cuentas por Pagar con la tasa ya congelada — no cambia aunque
+                  suba el BCV después.
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: C.rojo }}>
+                No hay tasa BCV cargada para el {f.fechaPedido}. Carga el historial en Ajustes → Tasas para poder calcular el IVA en Bs.
+              </div>
+            )}
+
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 12, fontWeight: 600, color: C.ink, cursor: "pointer" }}>
+              <input type="checkbox" checked={f.ivaPagada} onChange={(e) => setF({ ...f, ivaPagada: e.target.checked })} />
+              El IVA ya fue pagado
+            </label>
+          </div>
+        )}
+      </div>
       
       <div style={{ borderTop: `1px dashed ${C.line}`, marginTop: 4, paddingTop: 14 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, fontWeight: 700, color: C.greenDk, cursor: "pointer" }}>
@@ -292,48 +447,120 @@ export default function FormCompromiso({ proveedores, act, onSave, onClose }) {
               </div>
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 14 }}>
-              <Field label="N° de cuotas (del saldo)">
-                <Input 
-                  type="number" 
-                  value={f.numCuotas} 
-                  onChange={(e) => setF({ ...f, numCuotas: e.target.value })} 
-                />
-              </Field>
-              <Field label="% de financiamiento (opcional)">
-                <Input 
-                  type="number" 
-                  value={f.financiamientoPct} 
-                  onChange={(e) => setF({ ...f, financiamientoPct: e.target.value })} 
-                  placeholder="Ej. 10" 
-                />
-              </Field>
-              <Field label="Frecuencia">
-                <Select value={f.frecuencia} onChange={(e) => setF({ ...f, frecuencia: e.target.value })}>
-                  <option value="MENSUAL">Mensual</option>
-                  <option value="QUINCENAL">Quincenal</option>
-                  <option value="SEMANAL">Semanal</option>
-                </Select>
-              </Field>
-            </div>
-            <Field label="Vence 1ra cuota el">
-              <Input 
-                type="date" 
-                value={f.fechaVencimiento} 
-                onChange={(e) => setF({ ...f, fechaVencimiento: e.target.value })} 
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginTop: 14, marginBottom: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.greenDk }}>Saldo a financiar</div>
+              <Segmented
+                value={f.modoCuotas}
+                onChange={(v) => setF({ ...f, modoCuotas: v })}
+                options={[
+                  { id: "IGUALES", label: "Cuotas iguales" },
+                  { id: "PERSONALIZADO", label: "Plan de pago personalizado" }
+                ]}
               />
-            </Field>
-            
-            <div style={{ fontSize: 12, color: C.greenDk, marginTop: 4, fontWeight: 600 }}>
-              {pctFinanciamiento > 0 ? (
-                <>Saldo de {money(saldoBase, f.moneda)} + {pctFinanciamiento}% de financiamiento = {money(saldoFinanciado, f.moneda)}, repartido en {f.numCuotas || 0} cuotas de aprox. {money(montoPorCuota, f.moneda)}.</>
-              ) : (
-                <>El sistema proyectará {f.numCuotas || 0} cuotas de aprox. {money(montoPorCuota, f.moneda)}.</>
-              )}
             </div>
-            <div style={{ fontSize: 11, color: C.mut, marginTop: 4 }}>
-              El % de financiamiento se aplica como un recargo único sobre el saldo (no interés compuesto por cuota), repartido en partes iguales.
-            </div>
+
+            {f.modoCuotas === "IGUALES" ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 10 }}>
+                  <Field label="N° de cuotas (del saldo)">
+                    <Input 
+                      type="number" 
+                      value={f.numCuotas} 
+                      onChange={(e) => setF({ ...f, numCuotas: e.target.value })} 
+                    />
+                  </Field>
+                  <Field label="% de financiamiento (opcional)">
+                    <Input 
+                      type="number" 
+                      value={f.financiamientoPct} 
+                      onChange={(e) => setF({ ...f, financiamientoPct: e.target.value })} 
+                      placeholder="Ej. 10" 
+                    />
+                  </Field>
+                  <Field label="Frecuencia">
+                    <Select value={f.frecuencia} onChange={(e) => setF({ ...f, frecuencia: e.target.value })}>
+                      <option value="MENSUAL">Mensual</option>
+                      <option value="QUINCENAL">Quincenal</option>
+                      <option value="SEMANAL">Semanal</option>
+                    </Select>
+                  </Field>
+                </div>
+                <Field label="Vence 1ra cuota el">
+                  <Input 
+                    type="date" 
+                    value={f.fechaVencimiento} 
+                    onChange={(e) => setF({ ...f, fechaVencimiento: e.target.value })} 
+                  />
+                </Field>
+                
+                <div style={{ fontSize: 12, color: C.greenDk, marginTop: 4, fontWeight: 600 }}>
+                  {pctFinanciamiento > 0 ? (
+                    <>Saldo de {money(saldoBase, f.moneda)} + {pctFinanciamiento}% de financiamiento = {money(saldoFinanciado, f.moneda)}, repartido en {f.numCuotas || 0} cuotas de aprox. {money(montoPorCuota, f.moneda)}.</>
+                  ) : (
+                    <>El sistema proyectará {f.numCuotas || 0} cuotas de aprox. {money(montoPorCuota, f.moneda)}.</>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: C.mut, marginTop: 4 }}>
+                  El % de financiamiento se aplica como un recargo único sobre el saldo (no interés compuesto por cuota), repartido en partes iguales.
+                </div>
+              </>
+            ) : (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 11.5, color: C.mut, marginBottom: 10, lineHeight: 1.4 }}>
+                  Arma el cronograma a mano: un abono por fila, cada uno con su propio monto y fecha —
+                  igual que un plan de pago real con distintos proveedores o abonos escalonados
+                  (ej. 50.000 en junio, 20.000 a inicios de julio, 37.817,81 a fin de julio).
+                </div>
+
+                {(f.cuotasPersonalizadas || []).length === 0 && (
+                  <div style={{ fontSize: 12, color: C.mut, marginBottom: 10 }}>
+                    Sin cuotas todavía — agrega la primera.
+                  </div>
+                )}
+
+                {(f.cuotasPersonalizadas || []).map((c, i) => (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                    <Input
+                      type="number"
+                      value={c.monto}
+                      onChange={(e) => setCuotaPersonalizada(i, "monto", e.target.value)}
+                      placeholder={`Cuota ${i + 1}`}
+                      style={{ marginBottom: 0 }}
+                    />
+                    <Input
+                      type="date"
+                      value={c.fecha}
+                      onChange={(e) => setCuotaPersonalizada(i, "fecha", e.target.value)}
+                      style={{ marginBottom: 0 }}
+                    />
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: C.ink, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      <input type="checkbox" checked={c.pagada} onChange={(e) => setCuotaPersonalizada(i, "pagada", e.target.checked)} />
+                      Ya pagada
+                    </label>
+                    <Btn small variant="danger" onClick={() => delCuotaPersonalizada(i)}>
+                      <X size={13} />
+                    </Btn>
+                  </div>
+                ))}
+
+                <Btn small variant="ghost" onClick={addCuotaPersonalizada}>
+                  <Plus size={13} /> Agregar cuota
+                </Btn>
+
+                <div style={{ fontSize: 11.5, color: C.mut, marginTop: 10 }}>
+                  Saldo a financiar: <b style={{ color: C.ink }}>{money(saldoBase, f.moneda)}</b>
+                  {pctFinanciamiento > 0 && <> · con financiamiento: <b style={{ color: C.ink }}>{money(saldoFinanciado, f.moneda)}</b></>}
+                  {" "}· Suma de cuotas: <b style={{ color: C.ink }}>{money(sumaCuotasPersonalizadas, f.moneda)}</b>
+                </div>
+                {Math.abs(diferenciaPersonalizada) > 0.01 && (
+                  <div style={{ fontSize: 11.5, color: diferenciaPersonalizada > 0 ? C.amar : C.rojo, marginTop: 4, fontWeight: 600 }}>
+                    {diferenciaPersonalizada > 0
+                      ? `Faltan ${money(diferenciaPersonalizada, f.moneda)} por asignar en cuotas.`
+                      : `Las cuotas suman ${money(Math.abs(diferenciaPersonalizada), f.moneda)} de más sobre el saldo.`}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ marginTop: 12 }}>

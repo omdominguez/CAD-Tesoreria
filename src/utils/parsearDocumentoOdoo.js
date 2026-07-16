@@ -20,6 +20,13 @@ function normalizarMonto(raw) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Porcentajes como "16.0%" o "16,0%" usan el punto/coma como DECIMAL, nunca como separador de miles. */
+function normalizarPorcentaje(raw) {
+  if (!raw) return null;
+  const n = parseFloat(String(raw).replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
 function ddmmyyyyAyyyymmdd(raw) {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw || "");
   if (!m) return null;
@@ -76,22 +83,40 @@ export function parsearDocumentoOdoo(texto) {
   const moneda = ultimoTotal && /Bs/i.test(ultimoTotal[1] || "") ? "BS" : "USD";
   if (!monto) advertencias.push("No se pudo leer el monto total — ingrésalo manualmente.");
 
+  // 4.b) Desglose de impuestos: casi todos los pedidos de Odoo traen al final
+  // el resumen "Base imponible / Impuestos / Total" en ese orden — si aparece,
+  // se puede registrar la compra ya discriminada (base en USD + IVA aparte).
+  const mResumenFiscal = /Base imponible\s*\$?\s*([\d.,]+)[\s\S]{0,120}?Impuestos\s*\$?\s*([\d.,]+)[\s\S]{0,120}?Total\s*\$?\s*([\d.,]+)/i.exec(texto);
+  const baseImponible = mResumenFiscal ? normalizarMonto(mResumenFiscal[1]) : null;
+  const impuestos = mResumenFiscal ? normalizarMonto(mResumenFiscal[2]) : null;
+
+  // % de IVA: se toma de la primera línea "IVA (16.0%)" del detalle. Si el
+  // documento mezclara líneas con distinto %, se avisa para que se revise
+  // (el sistema solo puede aplicar un % único al separar el IVA).
+  const pctsIva = [...new Set([...texto.matchAll(/IVA\s*\(([\d.,]+)\s*%\)/gi)].map((m) => m[1]))];
+  const ivaPctDetectado = pctsIva.length ? normalizarPorcentaje(pctsIva[0]) : null;
+  if (baseImponible && impuestos && pctsIva.length > 1) {
+    advertencias.push(`El documento mezcla distintos % de IVA (${pctsIva.join(", ")}) — revisa el desglose antes de guardar.`);
+  }
+
   // 5) Fecha del documento (primera fecha con formato DD/MM/AAAA seguida de hora)
   const mFecha = /(\d{2}\/\d{2}\/\d{4})\s+\d{2}:\d{2}:\d{2}/.exec(texto);
   const fecha = mFecha ? ddmmyyyyAyyyymmdd(mFecha[1]) : null;
 
   // 6) Descripción sugerida: línea(s) de producto entre el encabezado de tabla y "Base imponible"
-  const mDesc = /Monto\n([\s\S]+?)\n(?:Base imponible|Subtotal)/i.exec(texto);
+  const mDesc = /Monto\n([\s\S]+?)\n\s*(?:Base imponible|Subtotal)/i.exec(texto);
   let descripcionSugerida = null;
   if (mDesc) {
-    // Solo la primera línea de producto: cortamos justo antes de la primera fecha
-    // (DD/MM/AAAA) o etiqueta de impuesto — ahí termina el nombre y empiezan los datos numéricos.
-    const primeraLinea = mDesc[1].split("\n")[0];
+    // Solo la primera línea de producto CON contenido (puede haber líneas en
+    // blanco de por medio) — cortamos justo antes de la primera fecha
+    // (DD/MM/AAAA) o etiqueta de impuesto, ahí termina el nombre y empiezan
+    // los datos numéricos.
+    const primeraLinea = (mDesc[1].split("\n").find((l) => l.trim().length > 0) || "");
     const corte = /\s+(?:Exento|IVA|\d{2}\/\d{2}\/\d{4})/i.exec(primeraLinea);
-    descripcionSugerida = (corte ? primeraLinea.slice(0, corte.index) : primeraLinea).trim();
+    descripcionSugerida = (corte ? primeraLinea.slice(0, corte.index) : primeraLinea).trim() || null;
   }
 
-  return { tipoDocumento, numeroDocumento, rif, nombreContraparte, confianzaNombre, monto, moneda, fecha, descripcionSugerida, advertencias };
+  return { tipoDocumento, numeroDocumento, rif, nombreContraparte, confianzaNombre, monto, moneda, fecha, descripcionSugerida, baseImponible, impuestos, ivaPctDetectado, advertencias };
 }
 
 /** Compara un RIF ignorando puntos, guiones y mayúsculas/minúsculas. */

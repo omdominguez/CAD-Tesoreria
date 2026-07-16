@@ -94,6 +94,12 @@ export function AdjuntarPdfOdoo({ contactos, onDatos, label = "Adjuntar PDF del 
                   "No se pudo identificar la contraparte — selecciónala manualmente."
                 )}
               </div>
+              {resumen.datos.baseImponible != null && resumen.datos.impuestos != null && (
+                <div style={{ color: C.greenDk, marginTop: 4 }}>
+                  Base imponible <b>${resumen.datos.baseImponible.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</b> + IVA{" "}
+                  <b>${resumen.datos.impuestos.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</b> detectados y separados automáticamente.
+                </div>
+              )}
               {resumen.datos.advertencias.length > 0 && (
                 <ul style={{ margin: "6px 0 0", paddingLeft: 16, color: C.mut }}>
                   {resumen.datos.advertencias.map((a, i) => <li key={i}>{a}</li>)}

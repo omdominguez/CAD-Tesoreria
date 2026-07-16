@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, Cell
+  Tooltip, Legend, ResponsiveContainer, Cell, ReferenceLine
 } from "recharts";
 import { TrendingUp, LineChart as LineIcon, BarChart3, GitCompareArrows, CalendarRange } from "lucide-react";
 
@@ -11,7 +11,7 @@ import {
   TASAS_META, etiquetaMes,
   serieHistorial, aniosDisponibles, filtrarPorRango, rangoFechas, tasaTieneDatos,
   resumenMensual, tablaComportamiento, variacionAcumulada,
-  serieBrecha, comparativoAnual
+  serieBrecha, resumenBrecha, tasasVigentes, comparativoAnual
 } from "../../utils/analisisTasas";
 import { exportarCSV, exportarExcel, exportarPDF } from "../../utils/exportar";
 
@@ -187,7 +187,7 @@ export default function AnalisisTasas({ st }) {
       {tab === "resumen" && <TabResumen serie={serie} keys={tasasActivas} periodoNombre={periodoNombre} periodoTexto={periodoTexto} />}
       {tab === "evolucion" && <TabEvolucion serie={serie} keys={tasasActivas} />}
       {tab === "variacion" && <TabVariacion serie={serie} tasaSel={tasaSel} setTasaSel={setTasaSel} keys={tasasActivas} />}
-      {tab === "brecha" && <TabBrecha serie={serie} />}
+      {tab === "brecha" && <TabBrecha serie={serie} keys={tasasActivas} />}
       {tab === "anual" && (
         <TabAnual
           serieCompleta={serieCompleta}
@@ -409,41 +409,248 @@ function TabVariacion({ serie, tasaSel, setTasaSel, keys }) {
 /* ============================================================
    PESTAÑA: BRECHA CAMBIARIA (Paralelo/Euro sobre BCV)
    ============================================================ */
-function TabBrecha({ serie }) {
+function TabBrecha({ serie, keys }) {
   const datos = useMemo(() => serieBrecha(serie), [serie]);
-  const ultimo = datos[datos.length - 1] || null;
+  const resumen = useMemo(() => resumenBrecha(datos), [datos]);
+  const vigentes = useMemo(() => tasasVigentes(serie), [serie]);
+
+  // Solo se ofrecen brechas de tasas que efectivamente tienen datos cargados
+  const BRECHAS_META = [
+    { dataKey: "brechaParalelo", tasaKey: "tasaParalelo", label: "Paralelo vs BCV", corto: "Paralelo", color: C.rojo, activa: keys.includes("tasaParalelo") },
+    { dataKey: "brechaIntervencion", tasaKey: "tasaIntervencion", label: "Intervención vs BCV", corto: "Intervención", color: C.gold, activa: keys.includes("tasaIntervencion") },
+    { dataKey: "brechaEuro", tasaKey: "tasaBcvEuro", label: "Euro vs BCV", corto: "Euro", color: C.azul, activa: keys.includes("tasaBcvEuro") }
+  ].filter((b) => b.activa && resumen[b.dataKey] !== null);
+
+  const [visibles, setVisibles] = useState(() => new Set(BRECHAS_META.map((b) => b.dataKey)));
+  const toggle = (k) => setVisibles((prev) => {
+    const s = new Set(prev);
+    s.has(k) ? s.delete(k) : s.add(k);
+    return s;
+  });
+
+  if (BRECHAS_META.length === 0) {
+    return (
+      <Card style={{ padding: 30, textAlign: "center", color: C.mut, fontSize: 13 }}>
+        Se necesita al menos otra tasa además de BCV ($) para calcular una brecha.
+      </Card>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 14, lineHeight: 1.5 }}>
+        Referencia: cobras a <b style={{ color: C.ink }}>BCV ($)</b>. Esto es lo que cuesta hoy comprar
+        de vuelta esos dólares en cada tasa del mercado — en % y en bolívares por cada dólar.
+      </div>
+
+      {/* Tarjetas: cuánto cuesta HOY comprar $1 en cada tasa vs BCV */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        {BRECHAS_META.map((b) => {
+          const tasaHoy = vigentes[b.tasaKey];
+          const bcvHoy = vigentes.tasaBCV;
+          const gapBs = tasaHoy !== null && bcvHoy !== null ? tasaHoy - bcvHoy : null;
+          const gapPct = gapBs !== null && bcvHoy > 0 ? (gapBs / bcvHoy) * 100 : null;
+          const r = resumen[b.dataKey];
+          return (
+            <Card key={b.dataKey} style={{ flex: "1 1 230px", minWidth: 220, padding: 16, borderTop: `4px solid ${b.color}` }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 6 }}>
+                {b.label}
+              </div>
+              {gapBs !== null ? (
+                <>
+                  <div style={{ fontFamily: FONTS.SANS, fontSize: 22, fontWeight: 800, color: b.color, letterSpacing: -0.4 }}>
+                    +Bs {nf.format(gapBs)}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: C.mut, marginTop: 2 }}>
+                    por cada $1 · {gapPct >= 0 ? "+" : ""}{nf.format(gapPct)}% sobre BCV
+                  </div>
+                  <div style={{ fontSize: 11, color: C.mut2, marginTop: 6 }}>
+                    Bs {nf.format(bcvHoy)} (BCV) → Bs {nf.format(tasaHoy)} ({b.corto})
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 12.5, color: C.mut, marginTop: 6 }}>Sin dato vigente</div>
+              )}
+              <div style={{ display: "flex", gap: 12, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}`, fontSize: 11 }}>
+                <span style={{ color: C.mut }}>Prom. período <b style={{ color: C.ink }}>{nf.format(r.promedio)}%</b></span>
+                <span style={{ color: C.mut }}>Máx <b style={{ color: C.ink }}>{nf.format(r.max)}%</b></span>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <CalculadoraBrecha vigentes={vigentes} brechasMeta={BRECHAS_META} />
+
+      <Card style={{ padding: 18, marginTop: 16 }}>
+        <div style={{ fontFamily: FONTS.SANS, fontSize: 14, fontWeight: 700, color: C.ink, marginBottom: 2 }}>
+          Cómo se ha movido la brecha en el tiempo
+        </div>
+        <div style={{ fontSize: 11.5, color: C.mut, marginBottom: 12 }}>
+          % de diferencia de cada tasa contra el BCV, día a día en el período seleccionado.
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          {BRECHAS_META.map((b) => {
+            const on = visibles.has(b.dataKey);
+            return (
+              <button
+                key={b.dataKey}
+                onClick={() => toggle(b.dataKey)}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "5px 11px", borderRadius: 999, cursor: "pointer",
+                  border: `1px solid ${on ? b.color : C.line}`,
+                  background: on ? b.color + "18" : "transparent",
+                  color: on ? C.ink : C.mut, fontSize: 12, fontWeight: 600, fontFamily: FONTS.SANS
+                }}
+              >
+                <span style={{ width: 9, height: 9, borderRadius: 999, background: on ? b.color : C.line }} />
+                {b.corto}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ height: 280 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={datos} margin={{ top: 6, right: 10, left: -6, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={C.line} vertical={false} />
+              <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: C.mut }} tickFormatter={fmtFechaCorta} minTickGap={44} />
+              <YAxis tick={{ fontSize: 10, fill: C.mut }} tickFormatter={(v) => v + "%"} width={46} />
+              <ReferenceLine y={0} stroke={C.mut2} strokeDasharray="2 4" />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                labelFormatter={(l) => new Date(l + "T00:00:00").toLocaleDateString("es-VE")}
+                formatter={(v, name) => [`${v >= 0 ? "+" : ""}${nf.format(v)}%`, BRECHAS_META.find((b) => b.dataKey === name)?.label || name]}
+              />
+              {BRECHAS_META.filter((b) => visibles.has(b.dataKey)).map((b) => (
+                <Line key={b.dataKey} type="monotone" dataKey={b.dataKey} stroke={b.color} strokeWidth={2} dot={false} connectNulls />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{ fontSize: 11, color: C.mut2, marginTop: 8 }}>
+          La línea punteada en 0% marca la paridad con el BCV. Una brecha que se abre indica presión cambiaria.
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================
+   CALCULADORA: cuánto cuesta comprar un monto en cada tasa
+   ============================================================ */
+function CalculadoraBrecha({ vigentes, brechasMeta }) {
+  const [monto, setMonto] = useState("1000");
+  const [modo, setModo] = useState("USD"); // "USD": tengo/necesito comprar N dólares · "BS": tengo N Bs y quiero saber cuántos USD alcanzan
+
+  const n = Number(monto) || 0;
+  const bcv = vigentes.tasaBCV;
+
+  if (!bcv) {
+    return (
+      <Card style={{ padding: 16, fontSize: 12.5, color: C.mut }}>
+        Falta la tasa BCV vigente para calcular. Verifica el historial en Ajustes → Tasas.
+      </Card>
+    );
+  }
 
   return (
     <Card style={{ padding: 18 }}>
-      {ultimo && (
-        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 12 }}>
-          <span style={{ fontSize: 12.5, color: C.mut }}>
-            Brecha Paralelo (último dato) <b style={{ color: C.rojo }}>+{ultimo.brechaParalelo !== null ? nf.format(ultimo.brechaParalelo) : "—"}%</b>
-          </span>
-          <span style={{ fontSize: 12.5, color: C.mut }}>
-            Brecha Euro (último dato) <b style={{ color: C.azul }}>+{ultimo.brechaEuro !== null ? nf.format(ultimo.brechaEuro) : "—"}%</b>
-          </span>
-        </div>
-      )}
-      <div style={{ height: 300 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={datos} margin={{ top: 6, right: 10, left: -6, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={C.line} vertical={false} />
-            <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: C.mut }} tickFormatter={fmtFechaCorta} minTickGap={44} />
-            <YAxis tick={{ fontSize: 10, fill: C.mut }} tickFormatter={(v) => v + "%"} width={46} />
-            <Tooltip
-              contentStyle={tooltipStyle}
-              labelFormatter={(l) => new Date(l + "T00:00:00").toLocaleDateString("es-VE")}
-              formatter={(v, name) => [`${nf.format(v)}%`, name === "brechaParalelo" ? "Paralelo vs BCV" : "Euro vs BCV"]}
-            />
-            <Legend formatter={(name) => name === "brechaParalelo" ? "Paralelo vs BCV" : "Euro vs BCV"} wrapperStyle={{ fontSize: 12 }} />
-            <Line type="monotone" dataKey="brechaParalelo" stroke={C.rojo} strokeWidth={2} dot={false} connectNulls />
-            <Line type="monotone" dataKey="brechaEuro" stroke={C.azul} strokeWidth={2} dot={false} connectNulls />
-          </LineChart>
-        </ResponsiveContainer>
+      <div style={{ fontFamily: FONTS.SANS, fontSize: 14, fontWeight: 700, color: C.ink, marginBottom: 10 }}>
+        Calculadora rápida
       </div>
-      <div style={{ fontSize: 11, color: C.mut2, marginTop: 8 }}>
-        Cuánto por encima del BCV oficial (USD) está cada referencia. Una brecha que se abre indica presión cambiaria.
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 14 }}>
+        <div style={{ minWidth: 160 }}>
+          <div style={{ fontSize: 11, color: C.mut, marginBottom: 4 }}>
+            {modo === "USD" ? "Dólares a comprar" : "Bolívares disponibles"}
+          </div>
+          <Input type="number" value={monto} onChange={(e) => setMonto(e.target.value)} style={{ marginBottom: 0 }} />
+        </div>
+        <div style={{ minWidth: 200 }}>
+          <div style={{ fontSize: 11, color: C.mut, marginBottom: 4 }}>Tengo</div>
+          <Segmented
+            value={modo}
+            onChange={setModo}
+            options={[{ id: "USD", label: "Necesito $ dólares" }, { id: "BS", label: "Tengo Bs" }]}
+          />
+        </div>
+      </div>
+
+      <div className="cad-table-scroll" style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <Th>Tasa</Th>
+              <Th right>Bs / $1</Th>
+              {modo === "USD" ? (
+                <>
+                  <Th right>Bs necesarios</Th>
+                  <Th right>vs BCV (Bs)</Th>
+                </>
+              ) : (
+                <>
+                  <Th right>$ que alcanzan</Th>
+                  <Th right>vs BCV ($)</Th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <Td bold>BCV ($) · referencia</Td>
+              <Td right style={{ fontVariantNumeric: "tabular-nums" }}>Bs {nf.format(bcv)}</Td>
+              {modo === "USD" ? (
+                <>
+                  <Td right style={{ fontVariantNumeric: "tabular-nums" }}>Bs {nf.format(n * bcv)}</Td>
+                  <Td right style={{ color: C.mut }}>—</Td>
+                </>
+              ) : (
+                <>
+                  <Td right style={{ fontVariantNumeric: "tabular-nums" }}>$ {nf.format(bcv > 0 ? n / bcv : 0)}</Td>
+                  <Td right style={{ color: C.mut }}>—</Td>
+                </>
+              )}
+            </tr>
+            {brechasMeta.map((b) => {
+              const tasa = vigentes[b.tasaKey];
+              if (!tasa) return null;
+              if (modo === "USD") {
+                const bsBcv = n * bcv;
+                const bsTasa = n * tasa;
+                const diff = bsTasa - bsBcv;
+                return (
+                  <tr key={b.dataKey}>
+                    <Td bold style={{ color: b.color }}>{b.corto}</Td>
+                    <Td right style={{ fontVariantNumeric: "tabular-nums" }}>Bs {nf.format(tasa)}</Td>
+                    <Td right style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>Bs {nf.format(bsTasa)}</Td>
+                    <Td right style={{ fontWeight: 700, color: diff > 0 ? C.rojo : diff < 0 ? C.verde : C.mut }}>
+                      {diff >= 0 ? "+" : ""}Bs {nf.format(diff)}
+                    </Td>
+                  </tr>
+                );
+              }
+              const usdBcv = n / bcv;
+              const usdTasa = tasa > 0 ? n / tasa : 0;
+              const diff = usdTasa - usdBcv;
+              return (
+                <tr key={b.dataKey}>
+                  <Td bold style={{ color: b.color }}>{b.corto}</Td>
+                  <Td right style={{ fontVariantNumeric: "tabular-nums" }}>Bs {nf.format(tasa)}</Td>
+                  <Td right style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>$ {nf.format(usdTasa)}</Td>
+                  <Td right style={{ fontWeight: 700, color: diff < 0 ? C.rojo : diff > 0 ? C.verde : C.mut }}>
+                    {diff >= 0 ? "+" : ""}$ {nf.format(diff)}
+                  </Td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ fontSize: 11, color: C.mut2, marginTop: 10 }}>
+        {modo === "USD"
+          ? "Cuántos bolívares de más necesitas para comprar ese monto en cada tasa, comparado con lo que hubieras pagado a BCV."
+          : "Con esos bolívares (cobrados a BCV), cuántos dólares menos alcanzas a comprar si el mercado está en cada tasa."}
       </div>
     </Card>
   );

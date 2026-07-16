@@ -139,18 +139,59 @@ export function variacionAcumulada(serie, key) {
 }
 
 /**
- * Brecha cambiaria diaria: por cada fecha, cuánto % está el Paralelo y el Euro
- * POR ENCIMA del BCV oficial en dólares (la referencia base). Útil para ver
- * cómo se abre o se cierra la brecha a lo largo del tiempo.
+ * Brecha cambiaria diaria: por cada fecha, cuánto % está el Paralelo, el Euro
+ * y la Intervención POR ENCIMA (o por debajo) del BCV oficial en dólares —
+ * la referencia base contra la que se compara todo. Útil para ver cómo se
+ * abre o se cierra la brecha de cada tasa a lo largo del tiempo.
  */
+/**
+ * Última tasa vigente de cada referencia (el dato más reciente disponible
+ * para cada una, no necesariamente del mismo día exacto si alguna quedó sin
+ * actualizar). Es la base para comparar "hoy" cuánto cuesta comprar en cada
+ * tasa frente al BCV, en bolívares reales — no solo en %.
+ */
+export function tasasVigentes(serie) {
+  const out = { tasaBCV: null, tasaParalelo: null, tasaBcvEuro: null, tasaIntervencion: null, fecha: null };
+  for (let i = serie.length - 1; i >= 0; i--) {
+    const r = serie[i];
+    if (out.tasaBCV === null && r.tasaBCV > 0) { out.tasaBCV = r.tasaBCV; out.fecha = r.fecha; }
+    if (out.tasaParalelo === null && r.tasaParalelo > 0) out.tasaParalelo = r.tasaParalelo;
+    if (out.tasaBcvEuro === null && r.tasaBcvEuro > 0) out.tasaBcvEuro = r.tasaBcvEuro;
+    if (out.tasaIntervencion === null && r.tasaIntervencion > 0) out.tasaIntervencion = r.tasaIntervencion;
+  }
+  return out;
+}
+
 export function serieBrecha(serie) {
   return serie
     .filter((r) => r.tasaBCV > 0)
     .map((r) => ({
       fecha: r.fecha,
       brechaParalelo: r.tasaParalelo > 0 ? ((r.tasaParalelo - r.tasaBCV) / r.tasaBCV) * 100 : null,
-      brechaEuro: r.tasaBcvEuro > 0 ? ((r.tasaBcvEuro - r.tasaBCV) / r.tasaBCV) * 100 : null
+      brechaEuro: r.tasaBcvEuro > 0 ? ((r.tasaBcvEuro - r.tasaBCV) / r.tasaBCV) * 100 : null,
+      brechaIntervencion: r.tasaIntervencion > 0 ? ((r.tasaIntervencion - r.tasaBCV) / r.tasaBCV) * 100 : null
     }));
+}
+
+/**
+ * Resumen estadístico de la brecha de una serie ya calculada (serieBrecha):
+ * promedio, mínimo y máximo de cada columna de brecha en el período, más el
+ * último dato disponible. Ignora los días sin dato (null) de cada tasa.
+ */
+export function resumenBrecha(serieBrechaCalculada) {
+  const KEYS = ["brechaParalelo", "brechaEuro", "brechaIntervencion"];
+  const out = {};
+  KEYS.forEach((k) => {
+    const vals = serieBrechaCalculada.map((r) => r[k]).filter((v) => v !== null && v !== undefined);
+    if (!vals.length) { out[k] = null; return; }
+    out[k] = {
+      promedio: vals.reduce((a, b) => a + b, 0) / vals.length,
+      min: Math.min(...vals),
+      max: Math.max(...vals),
+      ultimo: vals[vals.length - 1]
+    };
+  });
+  return out;
 }
 
 /**

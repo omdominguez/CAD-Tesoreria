@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 
 // Tema y finanzas
 import { C, FONTS } from "../../constants/theme";
@@ -13,7 +13,7 @@ import { Btn } from "../../components/ui/Buttons";
 import { Field, Input } from "../../components/ui/Forms";
 import { Th, Td, Pagination } from "../../components/ui/Table";
 import { usePaged } from "../../hooks/usePaged";
-import { RefreshCw, History, Plus, Pencil, Trash2, CalendarClock, Upload } from "lucide-react";
+import { RefreshCw, History, Plus, Pencil, Trash2, CalendarClock, Upload, AlertTriangle } from "lucide-react";
 
 export default function AjustesTasas({ st, act }) {
   const [sincronizando, setSincronizando] = useState(false);
@@ -362,10 +362,36 @@ function parsearReporte(texto) {
   return { validas, invalidas };
 }
 
+/** Redondeo a 2 decimales para comparar sin ruido de coma flotante. */
+const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+/**
+ * De las filas que YA existen en el historial, cuáles cambiarían de verdad
+ * (algún campo con un valor distinto al guardado) si se sobrescribe. Ignora
+ * las que coinciden exactamente — no tiene sentido "confirmar" algo idéntico.
+ */
+function calcularDiferenciasReales(validas, historialActual) {
+  const CAMPOS = [
+    { key: "tasaBCV", label: "BCV ($)" },
+    { key: "tasaBcvEuro", label: "BCV (€)" },
+    { key: "tasaParalelo", label: "Paralelo" }
+  ];
+  const diffs = [];
+  validas.forEach((v) => {
+    const previo = historialActual[v.fecha];
+    if (!previo) return;
+    const cambios = CAMPOS.filter((c) => r2(previo[c.key]) !== r2(v[c.key]))
+      .map((c) => ({ campo: c.label, viejo: Number(previo[c.key]) || 0, nuevo: v[c.key] }));
+    if (cambios.length > 0) diffs.push({ fecha: v.fecha, cambios });
+  });
+  return diffs.sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
 function ImportarHistorialModal({ historialActual, onClose, onImportar }) {
   const [texto, setTexto] = useState("");
   const [sobrescribir, setSobrescribir] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
+  const [paso, setPaso] = useState(0); // 0: formulario · 1: confirmación #1 · 2: confirmación #2 (definitiva)
 
   // Lee un archivo soltado o elegido y vuelca su contenido en el área de
   // texto (que ya alimenta el parser y la vista previa). Acepta texto plano
@@ -389,8 +415,9 @@ function ImportarHistorialModal({ historialActual, onClose, onImportar }) {
   const yaExisten = validas.filter((v) => historialActual[v.fecha]).length;
   const nuevas = validas.length - yaExisten;
   const aCargar = sobrescribir ? validas.length : nuevas;
+  const diferenciasReales = useMemo(() => (sobrescribir ? calcularDiferenciasReales(validas, historialActual) : []), [sobrescribir, validas, historialActual]);
 
-  const importar = () => {
+  const ejecutarImportacion = () => {
     if (validas.length === 0) return;
     const registros = {};
     validas.forEach((v) => {
@@ -398,10 +425,81 @@ function ImportarHistorialModal({ historialActual, onClose, onImportar }) {
     });
     const partes = [];
     if (nuevas > 0) partes.push(`${nuevas} día(s) nuevo(s)`);
-    if (sobrescribir && yaExisten > 0) partes.push(`${yaExisten} actualizado(s)`);
+    if (sobrescribir && diferenciasReales.length > 0) partes.push(`${diferenciasReales.length} corregido(s)`);
     if (!sobrescribir && yaExisten > 0) partes.push(`${yaExisten} ya existente(s) sin tocar`);
     onImportar(registros, sobrescribir, `Historial importado: ${partes.join(", ")}.`);
   };
+
+  // Si se van a sobrescribir días con valores REALMENTE distintos, exige
+  // doble confirmación antes de tocar nada. Si no hay cambios reales que
+  // sobrescribir (todo nuevo, o lo existente coincide), importa directo.
+  const importar = () => {
+    if (sobrescribir && diferenciasReales.length > 0) setPaso(1);
+    else ejecutarImportacion();
+  };
+
+  if (paso === 1) {
+    return (
+      <Modal title="Confirmar reemplazo (1 de 2)" onClose={() => setPaso(0)}>
+        <div style={{ display: "flex", gap: 10, padding: "12px 14px", background: C.amarSoft, borderRadius: 10, marginBottom: 14 }}>
+          <AlertTriangle size={18} color={C.amar} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 12.5, color: C.ink, lineHeight: 1.5 }}>
+            Estás a punto de <b>reemplazar {diferenciasReales.length} día(s)</b> que ya tienen valores guardados
+            en el historial. Esto no se puede deshacer automáticamente. Revisa los cambios antes de continuar.
+          </div>
+        </div>
+
+        <div style={{ maxHeight: 280, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+            <thead>
+              <tr style={{ background: C.body }}>
+                <Th>Fecha</Th>
+                <Th>Campo</Th>
+                <Th right>Valor actual</Th>
+                <Th right>Valor nuevo</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {diferenciasReales.flatMap((d) =>
+                d.cambios.map((c) => (
+                  <tr key={`${d.fecha}-${c.campo}`}>
+                    <Td bold>{d.fecha}</Td>
+                    <Td>{c.campo}</Td>
+                    <Td right style={{ color: C.mut }}>Bs {nf.format(c.viejo)}</Td>
+                    <Td right style={{ color: C.rojo, fontWeight: 700 }}>Bs {nf.format(c.nuevo)}</Td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+          <Btn variant="ghost" onClick={() => setPaso(0)}>Cancelar</Btn>
+          <Btn variant="danger" onClick={() => setPaso(2)}>Continuar</Btn>
+        </div>
+      </Modal>
+    );
+  }
+
+  if (paso === 2) {
+    return (
+      <Modal title="Confirmar reemplazo (2 de 2)" onClose={() => setPaso(0)}>
+        <div style={{ display: "flex", gap: 10, padding: "12px 14px", background: C.rojoSoft, borderRadius: 10, marginBottom: 16 }}>
+          <AlertTriangle size={18} color={C.rojo} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 13, color: C.ink, lineHeight: 1.6 }}>
+            Última confirmación. Se van a sobrescribir <b>{diferenciasReales.length} día(s)</b> del historial
+            de tasas con los valores nuevos que revisaste. Cualquier reporte o análisis que dependa de esos
+            días cambiará de inmediato.
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <Btn variant="ghost" onClick={() => setPaso(0)}>Cancelar</Btn>
+          <Btn variant="danger" onClick={ejecutarImportacion}>Sí, reemplazar {diferenciasReales.length} día(s)</Btn>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal title="Importar reporte de tasas por día" wide onClose={onClose}>
@@ -494,6 +592,13 @@ function ImportarHistorialModal({ historialActual, onClose, onImportar }) {
           <input type="checkbox" checked={sobrescribir} onChange={(e) => setSobrescribir(e.target.checked)} />
           Sobrescribir también los {yaExisten} día(s) que ya están guardados (la Intervención de esos días se conserva)
         </label>
+      )}
+      {sobrescribir && (
+        <div style={{ fontSize: 11.5, color: C.mut, marginTop: 4 }}>
+          {diferenciasReales.length > 0
+            ? `${diferenciasReales.length} de esos días tienen valores distintos a los guardados — te pediremos confirmar dos veces antes de reemplazarlos.`
+            : "Los días que ya existen coinciden con los valores guardados — no hay nada real que reemplazar."}
+        </div>
       )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>

@@ -243,9 +243,15 @@ const flechaEstilo = {
   cursor: "pointer"
 };
 
-export default function Tablero({ st }) {
+export default function Tablero({ st, permisos }) {
   const [semanas, setSemanas] = useState(12);
   const [estres, setEstres] = useState(false);
+
+  // Flags de visibilidad según permisos (por defecto todo visible)
+  const p = permisos || {};
+  const verBancos = p.verBancos !== false;
+  const verVentas = p.ventas !== false;
+  const verPagos = p.tesoreria !== false || p.compras === true;
 
   // Cálculos de KPIs principales
   const kpi = useMemo(() => {
@@ -325,16 +331,16 @@ export default function Tablero({ st }) {
   }
 
   const kpiItems = [
-    { t: "Disponible en bancos", v: kpi.disp, ic: Wallet, tone: C.green, sub: "Saldo bruto consolidado (USD)" },
-    { t: "Por cobrar", v: kpi.cobrar, ic: ArrowDownLeft, tone: C.verde, sub: "Facturas de clientes (USD)" },
-    { t: "Por pagar", v: kpi.comp, ic: ArrowUpRight, tone: C.gold, sub: "Egresos pendientes (USD)" },
-    { t: "Posición neta", v: kpi.neto, ic: kpi.neto >= 0 ? TrendingUp : TrendingDown, tone: kpi.neto >= 0 ? C.verde : C.rojo, sub: "Disponible + por cobrar − por pagar" }
-  ];
+    verBancos && { t: "Disponible en bancos", v: kpi.disp, ic: Wallet, tone: C.green, sub: "Saldo bruto consolidado (USD)" },
+    verVentas && { t: "Por cobrar", v: kpi.cobrar, ic: ArrowDownLeft, tone: C.verde, sub: "Facturas de clientes (USD)" },
+    verPagos && { t: "Por pagar", v: kpi.comp, ic: ArrowUpRight, tone: C.gold, sub: "Egresos pendientes (USD)" },
+    verBancos && { t: "Posición neta", v: kpi.neto, ic: kpi.neto >= 0 ? TrendingUp : TrendingDown, tone: kpi.neto >= 0 ? C.verde : C.rojo, sub: "Disponible + por cobrar − por pagar" }
+  ].filter(Boolean);
 
   return (
     <Section title="Tablero Principal" eyebrow="Resumen general" desc="Vista consolidada de tu posición de caja, proyección de pagos y saldos por banco.">
       {/* 0. Lectura rápida de cobertura */}
-      {cobertura && (
+      {verBancos && cobertura && (
         <Card style={{ padding: "14px 18px", marginBottom: 16, borderLeft: `3px solid ${cobertura.tono}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 34, height: 34, borderRadius: 8, background: C.body, display: "flex", alignItems: "center", justifyContent: "center", color: cobertura.tono, flexShrink: 0 }}>
@@ -366,17 +372,23 @@ export default function Tablero({ st }) {
         </div>
 
         <div style={{ display: "flex", gap: 10, margin: "12px 0 4px", flexWrap: "wrap" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.body, borderRadius: 999, padding: "4px 10px 4px 8px", fontSize: 11.5, color: C.mut }}>
-            <span style={{ width: 9, height: 9, borderRadius: 3, background: C.verde }} />
-            Ingresos <b style={{ color: C.ink }}>{money(totIn)}</b>
-          </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.body, borderRadius: 999, padding: "4px 10px 4px 8px", fontSize: 11.5, color: C.mut }}>
-            <span style={{ width: 9, height: 9, borderRadius: 3, background: C.gold }} />
-            Egresos <b style={{ color: C.ink }}>{money(totEg)}</b>
-          </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.body, borderRadius: 999, padding: "4px 10px", fontSize: 11.5, color: C.mut }}>
-            Balance del período <b style={{ color: (totIn - totEg) >= 0 ? C.verde : C.rojo }}>{money(totIn - totEg)}</b>
-          </span>
+          {verVentas && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.body, borderRadius: 999, padding: "4px 10px 4px 8px", fontSize: 11.5, color: C.mut }}>
+              <span style={{ width: 9, height: 9, borderRadius: 3, background: C.verde }} />
+              Ingresos <b style={{ color: C.ink }}>{money(totIn)}</b>
+            </span>
+          )}
+          {verPagos && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.body, borderRadius: 999, padding: "4px 10px 4px 8px", fontSize: 11.5, color: C.mut }}>
+              <span style={{ width: 9, height: 9, borderRadius: 3, background: C.gold }} />
+              Egresos <b style={{ color: C.ink }}>{money(totEg)}</b>
+            </span>
+          )}
+          {verVentas && verPagos && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.body, borderRadius: 999, padding: "4px 10px", fontSize: 11.5, color: C.mut }}>
+              Balance del período <b style={{ color: (totIn - totEg) >= 0 ? C.verde : C.rojo }}>{money(totIn - totEg)}</b>
+            </span>
+          )}
         </div>
 
         <div style={{ height: 250, marginTop: 10 }}>
@@ -390,8 +402,8 @@ export default function Tablero({ st }) {
                 labelStyle={{ color: C.ink }}
                 contentStyle={{ fontSize: 12, borderRadius: 10, border: `1px solid ${C.line}`, background: C.surface }}
               />
-              <Bar dataKey="ingreso" name="ingreso" fill={C.verde} radius={[3, 3, 0, 0]} maxBarSize={26} minPointSize={2} />
-              <Bar dataKey="egreso" name="egreso" fill={C.gold} radius={[3, 3, 0, 0]} maxBarSize={26} minPointSize={2} />
+              {verVentas && <Bar dataKey="ingreso" name="ingreso" fill={C.verde} radius={[3, 3, 0, 0]} maxBarSize={26} minPointSize={2} />}
+              {verPagos && <Bar dataKey="egreso" name="egreso" fill={C.gold} radius={[3, 3, 0, 0]} maxBarSize={26} minPointSize={2} />}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -403,10 +415,10 @@ export default function Tablero({ st }) {
       </Card>
 
       {/* 2.5 Próximos vencimientos: pagos a proveedores y facturas por cobrar */}
-      <ProximosVencimientos st={st} />
+      <ProximosVencimientos st={st} verPagos={verPagos} verCobros={verVentas} />
 
       {/* 3. Saldos por banco: tarjetas en vez de tabla */}
-      {(st.bancos || []).length > 0 && (
+      {verBancos && (st.bancos || []).length > 0 && (
         <Card style={{ padding: 20, marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <Landmark size={17} color={C.mut} />

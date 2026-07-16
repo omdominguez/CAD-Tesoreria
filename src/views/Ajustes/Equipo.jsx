@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { UserCheck, ShieldOff, Trash2 } from "lucide-react";
+import { UserCheck, ShieldOff, Trash2, SlidersHorizontal } from "lucide-react";
 
 // Servicios
 import { listProfiles, setProfileRole, aprobarUsuario, revocarUsuario, eliminarUsuario } from "../../services/store";
@@ -7,17 +7,19 @@ import { listProfiles, setProfileRole, aprobarUsuario, revocarUsuario, eliminarU
 // Constantes y Utilidades
 import { C, ROLES } from "../../constants/theme";
 import { fmtD } from "../../utils/finance";
+import { CAPACIDADES, permisosEfectivos } from "../../utils/permisos";
 
 // Componentes UI
-import { Section, Card } from "../../components/ui/Layout";
+import { Section, Card, Modal } from "../../components/ui/Layout";
 import { Th, Td } from "../../components/ui/Table";
 import { Select } from "../../components/ui/Forms";
 import { Btn } from "../../components/ui/Buttons";
 import { Badge } from "../../components/ui/Data";
 
-export default function Equipo({ meId }) {
+export default function Equipo({ meId, st, act }) {
   const [rows, setRows] = useState(null);
   const [rolPendiente, setRolPendiente] = useState({}); // { [id]: rolElegido } mientras se aprueba
+  const [permisosDe, setPermisosDe] = useState(null); // perfil cuyos permisos se están editando
 
   useEffect(() => {
     listProfiles().then(setRows).catch(console.error);
@@ -160,16 +162,23 @@ export default function Equipo({ meId }) {
                         </Select>
                       </Td>
                       <Td right>
-                        {p.id !== meId && (
-                          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                            <Btn small variant="danger" onClick={() => revocar(p.id)}>
-                              <ShieldOff size={13} /> Revocar
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                          {p.rol !== "MASTER" && (
+                            <Btn small variant="ghost" onClick={() => setPermisosDe(p)}>
+                              <SlidersHorizontal size={13} /> Permisos
                             </Btn>
-                            <Btn small variant="danger" onClick={() => eliminar(p.id, p.email)}>
-                              <Trash2 size={13} /> Eliminar
-                            </Btn>
-                          </div>
-                        )}
+                          )}
+                          {p.id !== meId && (
+                            <>
+                              <Btn small variant="danger" onClick={() => revocar(p.id)}>
+                                <ShieldOff size={13} /> Revocar
+                              </Btn>
+                              <Btn small variant="danger" onClick={() => eliminar(p.id, p.email)}>
+                                <Trash2 size={13} /> Eliminar
+                              </Btn>
+                            </>
+                          )}
+                        </div>
                       </Td>
                     </tr>
                   ))}
@@ -179,6 +188,59 @@ export default function Equipo({ meId }) {
           </Card>
         </>
       )}
+      {permisosDe && (
+        <PermisosModal
+          perfil={permisosDe}
+          permisosGuardados={st?.permisos?.[permisosDe.id]}
+          onClose={() => setPermisosDe(null)}
+          onSave={(permisos) => { act.setPermisosUsuario(permisosDe.id, permisos); setPermisosDe(null); }}
+        />
+      )}
     </Section>
+  );
+}
+
+/* ============================================================
+   MODAL: PERMISOS DE UN USUARIO
+   ------------------------------------------------------------
+   Prende/apaga capacidades por persona. Parte de la plantilla de
+   su rol y guarda lo que ajuste el Master. El Master no aparece
+   aquí (siempre tiene todo).
+   ============================================================ */
+function PermisosModal({ perfil, permisosGuardados, onClose, onSave }) {
+  const [permisos, setPermisos] = useState(() => permisosEfectivos(perfil.rol, permisosGuardados));
+
+  const toggle = (key) => setPermisos((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const nombre = perfil.nombre ? `${perfil.nombre} ${perfil.apellido || ""}`.trim() : perfil.email;
+
+  return (
+    <Modal title={`Permisos · ${nombre}`} onClose={onClose}>
+      <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 14, lineHeight: 1.5 }}>
+        Rol base: <b style={{ color: C.ink }}>{ROLES[perfil.rol] || perfil.rol}</b>. Marca lo que esta
+        persona puede ver y hacer. Si desmarcas "Ver disponibilidades bancarias", no verá saldos ni
+        disponible en el Tablero.
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        {CAPACIDADES.map((cap) => (
+          <label
+            key={cap.key}
+            style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.line}`, cursor: "pointer", background: permisos[cap.key] ? C.greenSoft : C.surface }}
+          >
+            <input type="checkbox" checked={!!permisos[cap.key]} onChange={() => toggle(cap.key)} style={{ marginTop: 2 }} />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{cap.label}</div>
+              <div style={{ fontSize: 11.5, color: C.mut }}>{cap.desc}</div>
+            </div>
+          </label>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+        <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+        <Btn onClick={() => onSave(permisos)}>Guardar permisos</Btn>
+      </div>
+    </Modal>
   );
 }

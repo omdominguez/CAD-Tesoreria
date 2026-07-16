@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   LayoutDashboard, 
   Users, 
@@ -9,7 +9,8 @@ import {
   Menu, 
   X,
   FileBarChart,
-  Landmark
+  Landmark,
+  Receipt
 } from "lucide-react";
 
 // Contexto de Autenticación
@@ -33,9 +34,11 @@ import Tablero from "./views/Tablero/Tablero";
 import Directorio from "./views/Directorio/Directorio";
 import Compromisos from "./views/Compras/Compromisos";
 import ModuloTesoreria from "./views/Tesoreria/ModuloTesoreria";
+import ModuloVentas from "./views/Ventas/ModuloVentas";
 import ModuloAjustes from "./views/Ajustes/ModuloAjustes";
 import ModuloReportes from "./views/Reportes/ModuloReportes";
 import ModuloBanco from "./views/Banco/ModuloBanco";
+import { permisosEfectivos } from "./utils/permisos";
 
 export default function Workspace({ st, act }) {
   const { user, role, signOut } = useAuth();
@@ -43,6 +46,19 @@ export default function Workspace({ st, act }) {
   const [modulo, setModulo] = useState("tablero");
   const [sidebarOpen, setSidebarOpen] = useState(() => !isMobile);
   const [modalPassword, setModalPassword] = useState(false);
+
+  // Permisos efectivos del usuario (plantilla de su rol + ajustes del Master)
+  const permisos = useMemo(
+    () => permisosEfectivos(role, st?.permisos?.[user?.id]),
+    [role, user?.id, st?.permisos]
+  );
+
+  // Si el módulo actual dejó de estar permitido (p. ej. el Master le quitó
+  // acceso en vivo), regresamos a un módulo seguro.
+  useEffect(() => {
+    const permitido = { tablero: permisos.tablero, directorio: true, compras: permisos.compras, ventas: permisos.ventas, tesoreria: permisos.tesoreria, reportes: permisos.reportes, banco: permisos.banco, ajustes: permisos.ajustes };
+    if (!permitido[modulo]) setModulo(permisos.tablero ? "tablero" : "directorio");
+  }, [permisos, modulo]);
 
   // En móvil el sidebar arranca cerrado (es un panel superpuesto);
   // en escritorio arranca abierto (empuja el contenido).
@@ -80,48 +96,53 @@ export default function Workspace({ st, act }) {
             </div>
           </div>
 
-          {/* Items de Navegación según Rol */}
+          {/* Items de Navegación según permisos del usuario */}
           <div style={{ display: "grid", gap: 4, padding: "0 8px" }}>
-            <SidebarItem act={modulo === "tablero"} onClick={() => ir("tablero")}>
-              <LayoutDashboard size={16} /> Tablero Principal
-            </SidebarItem>
+            {permisos.tablero && (
+              <SidebarItem act={modulo === "tablero"} onClick={() => ir("tablero")}>
+                <LayoutDashboard size={16} /> Tablero Principal
+              </SidebarItem>
+            )}
 
             <SidebarItem act={modulo === "directorio"} onClick={() => ir("directorio")}>
               <Users size={16} /> Cartera de Contactos
             </SidebarItem>
 
-            {/* Compras: Accesible por Compras y Gerencia (Master) */}
-            {(role === "COMPRAS" || role === "MASTER") && (
+            {permisos.compras && (
               <SidebarItem act={modulo === "compras"} onClick={() => ir("compras")}>
                 <ShoppingCart size={16} /> Módulo Compras
               </SidebarItem>
             )}
 
-            {/* Tesorería: Accesible por Tesorería y Gerencia (Master) */}
-            {(role === "TESORERIA" || role === "MASTER") && (
+            {permisos.ventas && (
+              <SidebarItem act={modulo === "ventas"} onClick={() => ir("ventas")}>
+                <Receipt size={16} /> Módulo Ventas
+              </SidebarItem>
+            )}
+
+            {permisos.tesoreria && (
               <SidebarItem act={modulo === "tesoreria"} onClick={() => ir("tesoreria")}>
                 <Wallet size={16} /> Módulo Tesorería
               </SidebarItem>
             )}
 
-            {/* Reportes: Accesible por Tesorería y Gerencia (Master) */}
-            {(role === "TESORERIA" || role === "MASTER") && (
-              <SidebarItem act={modulo === "reportes"} onClick={() => ir("reportes")}>
-                <FileBarChart size={16} /> Reportes
-              </SidebarItem>
-            )}
-
-            {/* Banco: movimientos y conciliación — Tesorería y Gerencia (Master) */}
-            {(role === "TESORERIA" || role === "MASTER") && (
+            {permisos.banco && (
               <SidebarItem act={modulo === "banco"} onClick={() => ir("banco")}>
                 <Landmark size={16} /> Banco
               </SidebarItem>
             )}
 
-            {/* Ajustes: Accesible por todos (cada subpestaña filtrará internamente) */}
-            <SidebarItem act={modulo === "ajustes"} onClick={() => ir("ajustes")}>
-              <Settings size={16} /> Ajustes del Sistema
-            </SidebarItem>
+            {permisos.reportes && (
+              <SidebarItem act={modulo === "reportes"} onClick={() => ir("reportes")}>
+                <FileBarChart size={16} /> Reportes
+              </SidebarItem>
+            )}
+
+            {permisos.ajustes && (
+              <SidebarItem act={modulo === "ajustes"} onClick={() => ir("ajustes")}>
+                <Settings size={16} /> Ajustes del Sistema
+              </SidebarItem>
+            )}
           </div>
         </div>
 
@@ -193,21 +214,24 @@ export default function Workspace({ st, act }) {
 
         {/* Renderizado Dinámico de Vistas según el estado 'modulo' */}
         <div style={{ padding: isMobile ? "4px 14px 32px" : "4px 24px 40px" }}>
-          {modulo === "tablero" && <Tablero st={st} />}
+          {modulo === "tablero" && permisos.tablero && <Tablero st={st} permisos={permisos} />}
           {modulo === "directorio" && <Directorio st={st} />}
-          {modulo === "compras" && (role === "COMPRAS" || role === "MASTER") && (
+          {modulo === "compras" && permisos.compras && (
             <Compromisos st={st} act={act} rol={role} />
           )}
-          {modulo === "tesoreria" && (role === "TESORERIA" || role === "MASTER") && (
+          {modulo === "ventas" && permisos.ventas && (
+            <ModuloVentas st={st} act={act} rol={role} />
+          )}
+          {modulo === "tesoreria" && permisos.tesoreria && (
             <ModuloTesoreria st={st} act={act} rol={role} usuario={user?.email} />
           )}
-          {modulo === "reportes" && (role === "TESORERIA" || role === "MASTER") && (
+          {modulo === "reportes" && permisos.reportes && (
             <ModuloReportes st={st} />
           )}
-          {modulo === "banco" && (role === "TESORERIA" || role === "MASTER") && (
+          {modulo === "banco" && permisos.banco && (
             <ModuloBanco st={st} act={act} rol={role} usuario={user?.email} />
           )}
-          {modulo === "ajustes" && (
+          {modulo === "ajustes" && permisos.ajustes && (
             <ModuloAjustes st={st} act={act} rol={role} meId={user?.id} />
           )}
         </div>

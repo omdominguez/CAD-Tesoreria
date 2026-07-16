@@ -27,7 +27,7 @@ const OPCIONES_FILTRO = [
  * cuotas de un mismo financiamiento que caen en el período se colapsan en una
  * sola fila para no inundar la vista con todas las cuotas de un financiado.
  */
-export default function ProximosVencimientos({ st }) {
+export default function ProximosVencimientos({ st, verPagos = true, verCobros = true }) {
   const hoy = hoy0();
   const [filtro, setFiltro] = useState("30");
 
@@ -95,23 +95,27 @@ export default function ProximosVencimientos({ st }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
-        <ListaVencimientos
-          titulo="Pagos próximos a proveedores"
-          items={pagos}
-          icono={ArrowUpRight}
-          color={C.gold}
-          hoy={hoy}
-          vacio="Sin pagos en este período."
-          mostrarSinBanco
-        />
-        <ListaVencimientos
-          titulo="Por cobrar próximas a vencer"
-          items={cobros}
-          icono={ArrowDownLeft}
-          color={C.verde}
-          hoy={hoy}
-          vacio="Sin cobros en este período."
-        />
+        {verPagos && (
+          <ListaVencimientos
+            titulo="Pagos próximos a proveedores"
+            items={pagos}
+            icono={ArrowUpRight}
+            color={C.gold}
+            hoy={hoy}
+            vacio="Sin pagos en este período."
+            mostrarSinBanco
+          />
+        )}
+        {verCobros && (
+          <ListaVencimientos
+            titulo="Por cobrar próximas a vencer"
+            items={cobros}
+            icono={ArrowDownLeft}
+            color={C.verde}
+            hoy={hoy}
+            vacio="Sin cobros en este período."
+          />
+        )}
       </div>
     </div>
   );

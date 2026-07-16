@@ -34,7 +34,7 @@ export default function ModuloAjustes({ st, act, rol, meId }) {
       {sub === "tasas" && <AjustesTasas st={st} act={act} />}
       {sub === "bancos" && <Bancos st={st} act={act} rol={rol} />}
       {sub === "contactos" && <GestorContactos st={st} act={act} rol={rol} />}
-      {sub === "equipo" && rol === "MASTER" && <Equipo meId={meId} />}
+      {sub === "equipo" && rol === "MASTER" && <Equipo meId={meId} st={st} act={act} />}
     </div>
   );
 }

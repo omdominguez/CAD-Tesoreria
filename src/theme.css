@@ -85,46 +85,46 @@
 /* Modo oscuro automático: solo cuando el usuario no forzó un modo */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    --navy: #4A7C89;
-    --navy-soft: #16262B;
+    --navy: #147A8A;
+    --navy-soft: #0E3A46;
 
-    --ink: #EDEFE8;
-    --mut: #A2ACA2;
-    --mut2: #67716A;
-    --line: #2B2E26;
-    --line-strong: #3A3E34;
-    --paper: #16180F;
-    --body: #1D1F1A;
-    --surface: #212319;
+    --ink: #EAF2F3;
+    --mut: #93AAB0;
+    --mut2: #5F7C83;
+    --line: #16454F;
+    --line-strong: #22606C;
+    --paper: #072A34;
+    --body: #05222B;
+    --surface: #0C3946;
 
-    --green: #4FAE7A;
-    --green-dk: #7FBF97;
-    --green-soft: #1B3324;
+    --green: #1FAA5E;
+    --green-dk: #46C583;
+    --green-soft: #0C3A2A;
 
-    --gold: #FF9A4D;
-    --gold-soft: #3A2A18;
+    --gold: #F98A2E;
+    --gold-soft: #3A2712;
 
-    --rojo: #E5837A;
-    --rojo-soft: #3A2020;
-    --amar: #E0B45A;
-    --amar-soft: #362C16;
-    --verde: #4FAE7A;
-    --verde-soft: #1B3324;
-    --azul: #6FA0BE;
-    --azul-soft: #1C2C34;
-    --mut-soft: #262920;
-    --rojo-line: #4A2C2A;
+    --rojo: #DA5A50;
+    --rojo-soft: #3A1E1C;
+    --amar: #E7A94A;
+    --amar-soft: #38290F;
+    --verde: #1FAA5E;
+    --verde-soft: #0C3A2A;
+    --azul: #4F98BE;
+    --azul-soft: #0E2E3B;
+    --mut-soft: #0F3540;
+    --rojo-line: #4E2622;
 
     /* Liquid glass en modo oscuro */
-    --glass-bg: rgba(28,30,24,0.55);
-    --glass-bg-strong: rgba(28,30,24,0.72);
-    --glass-border: rgba(255,255,255,0.08);
-    --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.06);
+    --glass-bg: rgba(6,38,47,0.55);
+    --glass-bg-strong: rgba(6,38,47,0.72);
+    --glass-border: rgba(120,200,210,0.10);
+    --glass-highlight: inset 0 1px 0 rgba(200,240,245,0.06);
     --glass-blur: 22px;
-    --blob-a: rgba(74,124,137,0.26);
-    --blob-b: rgba(255,154,77,0.18);
+    --blob-a: rgba(20,122,138,0.30);
+    --blob-b: rgba(247,123,28,0.20);
 
-    --shadow: 0 1px 2px rgba(0,0,0,0.28);
+    --shadow: 0 1px 2px rgba(0,0,0,0.30);
     --shadow-modal: 0 24px 60px rgba(0,0,0,0.55);
 
     color-scheme: dark;
@@ -133,49 +133,49 @@
 
 /* Modo oscuro forzado manualmente (independiente del sistema operativo) */
 :root[data-theme="dark"] {
-  --navy: #4A7C89;
-  --navy-soft: #16262B;
+  --navy: #147A8A;
+    --navy-soft: #0E3A46;
 
-  --ink: #EDEFE8;
-  --mut: #A2ACA2;
-  --mut2: #67716A;
-  --line: #2B2E26;
-  --line-strong: #3A3E34;
-  --paper: #16180F;
-  --body: #1D1F1A;
-  --surface: #212319;
+    --ink: #EAF2F3;
+    --mut: #93AAB0;
+    --mut2: #5F7C83;
+    --line: #16454F;
+    --line-strong: #22606C;
+    --paper: #072A34;
+    --body: #05222B;
+    --surface: #0C3946;
 
-  --green: #4FAE7A;
-  --green-dk: #7FBF97;
-  --green-soft: #1B3324;
+    --green: #1FAA5E;
+    --green-dk: #46C583;
+    --green-soft: #0C3A2A;
 
-  --gold: #FF9A4D;
-  --gold-soft: #3A2A18;
+    --gold: #F98A2E;
+    --gold-soft: #3A2712;
 
-  --rojo: #E5837A;
-  --rojo-soft: #3A2020;
-  --amar: #E0B45A;
-  --amar-soft: #362C16;
-  --verde: #4FAE7A;
-  --verde-soft: #1B3324;
-  --azul: #6FA0BE;
-  --azul-soft: #1C2C34;
-  --mut-soft: #262920;
-  --rojo-line: #4A2C2A;
+    --rojo: #DA5A50;
+    --rojo-soft: #3A1E1C;
+    --amar: #E7A94A;
+    --amar-soft: #38290F;
+    --verde: #1FAA5E;
+    --verde-soft: #0C3A2A;
+    --azul: #4F98BE;
+    --azul-soft: #0E2E3B;
+    --mut-soft: #0F3540;
+    --rojo-line: #4E2622;
 
-  /* Liquid glass en modo oscuro */
-  --glass-bg: rgba(28,30,24,0.55);
-  --glass-bg-strong: rgba(28,30,24,0.72);
-  --glass-border: rgba(255,255,255,0.08);
-  --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.06);
-  --glass-blur: 22px;
-  --blob-a: rgba(74,124,137,0.26);
-  --blob-b: rgba(255,154,77,0.18);
+    /* Liquid glass en modo oscuro */
+    --glass-bg: rgba(6,38,47,0.55);
+    --glass-bg-strong: rgba(6,38,47,0.72);
+    --glass-border: rgba(120,200,210,0.10);
+    --glass-highlight: inset 0 1px 0 rgba(200,240,245,0.06);
+    --glass-blur: 22px;
+    --blob-a: rgba(20,122,138,0.30);
+    --blob-b: rgba(247,123,28,0.20);
 
-  --shadow: 0 1px 2px rgba(0,0,0,0.28);
-  --shadow-modal: 0 24px 60px rgba(0,0,0,0.55);
+    --shadow: 0 1px 2px rgba(0,0,0,0.30);
+    --shadow-modal: 0 24px 60px rgba(0,0,0,0.55);
 
-  color-scheme: dark;
+    color-scheme: dark;
 }
 
 * { box-sizing: border-box; }

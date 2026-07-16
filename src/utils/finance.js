@@ -156,6 +156,20 @@ export const bancosProv = (p) => Array.isArray(p?.bancos) ? p.bancos : (p?.banco
  * orden cronológico, con el saldo progresivo calculado paso a paso.
  * Se usa tanto en el Libro de Bancos como en las tarjetas de Ajustes → Bancos.
  */
+/**
+ * Recalcula lo que DEBERÍA ser el saldo actual de un banco a partir de su
+ * saldo inicial + todos sus movimientos (pagos y cobranzas), sin importar
+ * si están conciliados o no. Sirve para corregir el desfase que se produce
+ * si alguna vez se editó "Saldo actual" a mano en Ajustes → Bancos (ese
+ * campo debería reflejar siempre el libro, no un número aparte).
+ */
+export function saldoActualRecalculado(st, bancoId) {
+  const banco = (st.bancos || []).find((b) => b.id === bancoId);
+  if (!banco) return 0;
+  const ledger = construirLedgerBanco(st, bancoId);
+  return ledger.length ? ledger[0].saldoProgresivo : Number(banco.saldoInicial || 0);
+}
+
 export function construirLedgerBanco(st, bancoId) {
   if (!bancoId) return [];
   const bancoSel = (st.bancos || []).find((b) => b.id === bancoId);

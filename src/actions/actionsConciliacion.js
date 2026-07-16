@@ -1,4 +1,5 @@
 import { saveState } from "../services/store";
+import { saldoActualRecalculado } from "../utils/finance";
 
 /**
  * Acciones del módulo Banco: marcar movimientos/cobranzas como
@@ -49,6 +50,24 @@ export function crearAccionesConciliacion(setSt, userId) {
     eliminarConciliacion: (id) => {
       setSt((prev) => {
         const next = { ...prev, conciliaciones: (prev.conciliaciones || []).filter((c) => c.id !== id) };
+        saveState(next, userId).catch(console.error);
+        return next;
+      });
+    },
+
+    /**
+     * Corrige el "Saldo actual" de un banco recalculándolo desde su saldo
+     * inicial + todos sus movimientos reales (pagos y cobranzas), en vez de
+     * depender de un número editado a mano. Se usa cuando la Diferencia por
+     * conciliar no cierra en cero aunque todo esté marcado como conciliado.
+     */
+    recalcularSaldoBanco: (bancoId) => {
+      setSt((prev) => {
+        const nuevoSaldo = saldoActualRecalculado(prev, bancoId);
+        const next = {
+          ...prev,
+          bancos: (prev.bancos || []).map((b) => (b.id === bancoId ? { ...b, saldoActual: nuevoSaldo } : b))
+        };
         saveState(next, userId).catch(console.error);
         return next;
       });

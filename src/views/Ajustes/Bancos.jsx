@@ -227,18 +227,33 @@ function BancoModal({ initialData, onClose, onSave }) {
           <Input 
             type="number" 
             value={f.saldoInicial} 
+            disabled={!!initialData}
             onChange={(e) => setF({ ...f, saldoInicial: e.target.value })} 
           />
         </Field>
         
-        <Field label="Saldo actual">
-          <Input 
-            type="number" 
-            value={f.saldoActual} 
-            onChange={(e) => setF({ ...f, saldoActual: e.target.value })} 
-          />
-        </Field>
+        {initialData ? (
+          <Field label="Saldo actual">
+            <div style={{ display: "flex", alignItems: "center", height: 38, fontSize: 13.5, fontWeight: 700, color: C.ink }}>
+              {money(Number(f.saldoActual) || 0, f.moneda)}
+            </div>
+          </Field>
+        ) : (
+          <Field label="Saldo actual">
+            <Input 
+              type="number" 
+              value={f.saldoActual} 
+              onChange={(e) => setF({ ...f, saldoActual: e.target.value })} 
+            />
+          </Field>
+        )}
       </div>
+      {initialData && (
+        <div style={{ fontSize: 11.5, color: C.mut, marginTop: -4, marginBottom: 6, lineHeight: 1.4 }}>
+          El saldo actual ya no se edita a mano aquí — lo actualizan automáticamente los pagos y cobranzas
+          registrados. Si no coincide con el libro, corrígelo desde Banco → "Recalcular saldo".
+        </div>
+      )}
       
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
         <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>

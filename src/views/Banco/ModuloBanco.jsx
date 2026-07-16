@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from "react";
-import { Landmark, ArrowUpRight, ArrowDownLeft, CheckCircle2, Circle, ClipboardCheck, Plus, Trash2, Search } from "lucide-react";
+import React, { useState, useMemo, useRef } from "react";
+import { Landmark, ArrowUpRight, ArrowDownLeft, CheckCircle2, Circle, ClipboardCheck, Plus, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { C, FONTS } from "../../constants/theme";
-import { money, fmtD, construirLedgerBanco, bancosOrdenados } from "../../utils/finance";
+import { money, fmtD, construirLedgerBanco, bancosOrdenados, brutoUSD } from "../../utils/finance";
 import { exportarCSV, exportarExcel, exportarPDF } from "../../utils/exportar";
 import { usePaged } from "../../hooks/usePaged";
 
@@ -10,7 +10,6 @@ import { AvatarBanco } from "../../components/shared/AvatarBanco";
 import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
 import { Th, Td, Pagination } from "../../components/ui/Table";
 import { Select, Input, Field } from "../../components/ui/Forms";
-import { ComboBox } from "../../components/ui/ComboBox";
 import { Btn, Segmented } from "../../components/ui/Buttons";
 import { Badge } from "../../components/ui/Data";
 import { ExportMenu } from "../../components/ui/ExportMenu";
@@ -112,16 +111,9 @@ export default function ModuloBanco({ st, act, rol, usuario }) {
       title="Banco"
       desc="Movimientos completos de cada cuenta y conciliación contra el estado de cuenta real."
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 260 }}>
-          <AvatarBanco nombre={bancoSel?.nombre} tamano={34} />
-          <ComboBox
-            value={bancoId}
-            onChange={(v) => { setBancoId(v); setSeleccion([]); }}
-            placeholder="Elegir cuenta..."
-            options={bancos.map((b) => ({ value: b.id, label: b.nombre, sublabel: b.moneda }))}
-          />
-        </div>
+      <SelectorBancos bancos={bancos} bancoId={bancoId} st={st} onSelect={(id) => { setBancoId(id); setSeleccion([]); }} />
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
         <Segmented
           value={tab}
           onChange={setTab}
@@ -507,3 +499,82 @@ function DetalleConciliacionModal({ conciliacion, banco, ledgerCompleto, onClose
     </Modal>
   );
 }
+
+/* ============================================================
+   SELECTOR DE BANCOS: tira deslizable de tarjetas
+   ------------------------------------------------------------
+   Reemplaza el desplegable de toda la vida por tarjetas con
+   logo, nombre, moneda y disponible neto — se ve el conjunto de
+   un vistazo, sin desplegar nada y sin ocupar una lista larga.
+   Con pocas cuentas cabe todo; con muchas, se desliza con las
+   flechas o arrastrando (como el carrusel del Tablero).
+   ============================================================ */
+function SelectorBancos({ bancos, bancoId, st, onSelect }) {
+  const scrollRef = useRef(null);
+
+  const desplazar = (dir) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * 260, behavior: "smooth" });
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+      <button onClick={() => desplazar(-1)} aria-label="Anterior" style={flechaBancoEstilo}>
+        <ChevronLeft size={16} />
+      </button>
+
+      <div
+        ref={scrollRef}
+        className="cad-segmented-scroll"
+        style={{ display: "flex", gap: 10, overflowX: "auto", scrollBehavior: "smooth", padding: "2px" }}
+      >
+        {bancos.map((b) => {
+          const activo = b.id === bancoId;
+          const disponible = brutoUSD(st, b);
+          return (
+            <button
+              key={b.id}
+              onClick={() => onSelect(b.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
+                padding: "8px 14px 8px 10px", borderRadius: 12, cursor: "pointer",
+                border: `1.5px solid ${activo ? C.verde : C.line}`,
+                background: activo ? C.greenSoft : C.surface,
+                minWidth: 190, textAlign: "left", fontFamily: FONTS.SANS
+              }}
+            >
+              <AvatarBanco nombre={b.nombre} tamano={30} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>
+                  {b.nombre}
+                </div>
+                <div style={{ fontSize: 11, color: C.mut, fontVariantNumeric: "tabular-nums" }}>
+                  {money(disponible, "USD")} · {b.moneda}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <button onClick={() => desplazar(1)} aria-label="Siguiente" style={flechaBancoEstilo}>
+        <ChevronRight size={16} />
+      </button>
+    </div>
+  );
+}
+
+const flechaBancoEstilo = {
+  width: 32,
+  height: 32,
+  borderRadius: 999,
+  border: `1px solid ${C.line}`,
+  background: C.surface,
+  color: C.mut,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  flexShrink: 0
+};

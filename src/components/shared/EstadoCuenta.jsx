@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, ChevronRight } from "lucide-react";
 
 // Tema y utilidades
 import { C, FONTS } from "../../constants/theme";
@@ -22,6 +22,31 @@ const slug = (s) =>
     .replace(/^_+|_+$/g, "");
 
 /**
+ * Agrupa las filas del estado de cuenta por número de pedido/factura: un
+ * pedido financiado en varias cuotas + su IVA aparte deja de verse como
+ * 4 líneas sueltas y pasa a ser UNA fila con el monto total del pedido,
+ * lo pagado y lo pendiente — con el detalle disponible al expandirla.
+ */
+function agruparPorPedido(rows) {
+  const grupos = {};
+  const orden = [];
+  rows.forEach((r, i) => {
+    const clave = r.pedido && r.pedido !== "—" ? r.pedido : `__sin_pedido_${i}`;
+    if (!grupos[clave]) {
+      grupos[clave] = { clave, pedido: r.pedido, filas: [], cargoUSD: 0, abonoUSD: 0, fechaMin: r.fecha, fechaMax: r.fecha, moneda: r.moneda };
+      orden.push(clave);
+    }
+    const g = grupos[clave];
+    g.filas.push(r);
+    if (r.cargo > 0) g.cargoUSD += r.usd;
+    if (r.abono > 0) g.abonoUSD += -r.usd;
+    if ((r.fecha || "") < (g.fechaMin || "")) g.fechaMin = r.fecha;
+    if ((r.fecha || "") > (g.fechaMax || "")) g.fechaMax = r.fecha;
+  });
+  return orden.map((c) => grupos[c]).sort((a, b) => (a.fechaMin || "").localeCompare(b.fechaMin || ""));
+}
+
+/**
  * Estado de cuenta con filtros (tipo de movimiento, rango de fechas,
  * búsqueda por pedido/documento) y exportación a CSV — el archivo
  * exportado respeta exactamente lo que esté filtrado en pantalla.
@@ -31,6 +56,14 @@ export function EstadoCuenta({ rows, nombreContacto = "cuenta", etiquetaCargo = 
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [q, setQ] = useState("");
+  const [vista, setVista] = useState("PEDIDO"); // "PEDIDO" | "DETALLE"
+  const [expandidos, setExpandidos] = useState(new Set());
+
+  const toggleExpandido = (clave) => setExpandidos((prev) => {
+    const s = new Set(prev);
+    s.has(clave) ? s.delete(clave) : s.add(clave);
+    return s;
+  });
 
   const tiposDisponibles = useMemo(() => {
     const set = new Set((rows || []).map((r) => r.tipo));
@@ -90,10 +123,17 @@ export function EstadoCuenta({ rows, nombreContacto = "cuenta", etiquetaCargo = 
     }
   };
 
+  const grupos = useMemo(() => agruparPorPedido(filtradas), [filtradas]);
+
   return (
     <div>
       {/* Filtros */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 10 }}>
+        <Segmented
+          value={vista}
+          onChange={setVista}
+          options={[{ id: "PEDIDO", label: "Por pedido" }, { id: "DETALLE", label: "Detallado" }]}
+        />
         <Segmented
           value={tipo}
           onChange={setTipo}
@@ -115,24 +155,105 @@ export function EstadoCuenta({ rows, nombreContacto = "cuenta", etiquetaCargo = 
       )}
 
       <div style={{ border: `1px solid ${C.line}`, borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ maxHeight: 320, overflow: "auto" }}>
+        <div style={{ maxHeight: 420, overflow: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr>
-                <Th>Fecha</Th>
-                <Th>Pedido / Documento</Th>
-                <Th right>{etiquetaCargo}</Th>
-                <Th right>{etiquetaAbono}</Th>
-                <Th right>Saldo (USD)</Th>
-              </tr>
+              {vista === "PEDIDO" ? (
+                <tr>
+                  <Th></Th>
+                  <Th>Fecha</Th>
+                  <Th>Pedido / Documento</Th>
+                  <Th right>Monto total</Th>
+                  <Th right>Pagado</Th>
+                  <Th right>Pendiente</Th>
+                </tr>
+              ) : (
+                <tr>
+                  <Th>Fecha</Th>
+                  <Th>Pedido / Documento</Th>
+                  <Th right>{etiquetaCargo}</Th>
+                  <Th right>{etiquetaAbono}</Th>
+                  <Th right>Saldo (USD)</Th>
+                </tr>
+              )}
             </thead>
             <tbody>
               {filtradas.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: "22px 14px", textAlign: "center", color: C.mut, fontSize: 12.5 }}>
+                  <td colSpan={vista === "PEDIDO" ? 6 : 5} style={{ padding: "22px 14px", textAlign: "center", color: C.mut, fontSize: 12.5 }}>
                     Ningún movimiento coincide con el filtro actual.
                   </td>
                 </tr>
+              ) : vista === "PEDIDO" ? (
+                grupos.flatMap((g) => {
+                  const pendiente = g.cargoUSD - g.abonoUSD;
+                  const abierto = expandidos.has(g.clave);
+                  const filasGrupo = [
+                    <tr
+                      key={g.clave}
+                      onClick={() => toggleExpandido(g.clave)}
+                      style={{ cursor: "pointer", background: abierto ? C.body : "transparent" }}
+                    >
+                      <Td>
+                        <ChevronRight
+                          size={14}
+                          color={C.mut}
+                          style={{ transform: abierto ? "rotate(90deg)" : "none", transition: "transform .12s" }}
+                        />
+                      </Td>
+                      <Td>{fmtD(g.fechaMax)}</Td>
+                      <Td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                          <Badge tone="gold">{g.pedido && g.pedido !== "—" ? g.pedido : "Sin pedido"}</Badge>
+                          {g.filas.length > 1 && (
+                            <span style={{ fontSize: 11, color: C.mut }}>{g.filas.length} movimiento(s)</span>
+                          )}
+                        </div>
+                      </Td>
+                      <Td right bold>{money(g.cargoUSD, "USD")}</Td>
+                      <Td right>
+                        {g.abonoUSD > 0.005 ? <span style={{ color: C.verde }}>{money(g.abonoUSD, "USD")}</span> : "—"}
+                      </Td>
+                      <Td right bold>
+                        <span style={{ color: pendiente > 0.005 ? C.rojo : C.verde }}>{money(pendiente, "USD")}</span>
+                      </Td>
+                    </tr>
+                  ];
+
+                  if (abierto) {
+                    g.filas.forEach((r, i) => {
+                      filasGrupo.push(
+                        <tr key={`${g.clave}-${i}`} style={{ background: C.body }}>
+                          <Td></Td>
+                          <Td style={{ fontSize: 12 }}>{fmtD(r.fecha)}</Td>
+                          <Td>
+                            <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                              <Badge tone={r.cargo > 0 ? "gold" : "verde"}>{r.tipo}</Badge>
+                              <span style={{ fontSize: 12 }}>{r.doc}</span>
+                            </div>
+                            <div style={{ fontSize: 10.5, color: C.mut, marginTop: 2 }}>{r.detalle}</div>
+                          </Td>
+                          <Td right style={{ fontSize: 12 }}>{r.cargo > 0 ? money(r.cargo, r.moneda) : "—"}</Td>
+                          <Td right style={{ fontSize: 12 }}>
+                            {r.abono > 0 ? (
+                              <div>
+                                <span style={{ color: C.verde }}>{money(r.abono, r.moneda)}</span>
+                                {r.moneda !== "USD" && r.tasa && (
+                                  <div style={{ fontSize: 10, color: C.mut, fontWeight: 500 }}>
+                                    tasa {r.tasa} → {money(-r.usd, "USD")}
+                                  </div>
+                                )}
+                              </div>
+                            ) : "—"}
+                          </Td>
+                          <Td right style={{ fontSize: 12, color: C.mut }}>{money(r.saldo, "USD")}</Td>
+                        </tr>
+                      );
+                    });
+                  }
+
+                  return filasGrupo;
+                })
               ) : (
                 filtradas.map((r, i) => (
                   <tr key={i}>

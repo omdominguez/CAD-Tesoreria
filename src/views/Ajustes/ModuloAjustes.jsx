@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { TrendingDown, Landmark, Users, UserCog } from "lucide-react";
+import { TrendingDown, Landmark, Users, UserCog, Plug } from "lucide-react";
 
 // Componentes UI
 import { Segmented } from "../../components/ui/Buttons";
@@ -9,6 +9,7 @@ import AjustesTasas from "./AjustesTasas";
 import Bancos from "./Bancos";
 import GestorContactos from "./GestorContactos";
 import Equipo from "./Equipo";
+import IntegracionOdoo from "./IntegracionOdoo";
 
 export default function ModuloAjustes({ st, act, rol, meId }) {
   const [sub, setSub] = useState("tasas");
@@ -20,9 +21,10 @@ export default function ModuloAjustes({ st, act, rol, meId }) {
     { id: "contactos", label: "Contactos", icon: Users },
   ];
   
-  // Solo los administradores principales pueden gestionar el equipo
+  // Solo los administradores principales pueden gestionar el equipo y la integración con Odoo
   if (rol === "MASTER") {
     opts.push({ id: "equipo", label: "Equipo", icon: UserCog });
+    opts.push({ id: "odoo", label: "Integración Odoo", icon: Plug });
   }
 
   return (
@@ -35,6 +37,7 @@ export default function ModuloAjustes({ st, act, rol, meId }) {
       {sub === "bancos" && <Bancos st={st} act={act} rol={rol} />}
       {sub === "contactos" && <GestorContactos st={st} act={act} rol={rol} />}
       {sub === "equipo" && rol === "MASTER" && <Equipo meId={meId} st={st} act={act} />}
+      {sub === "odoo" && rol === "MASTER" && <IntegracionOdoo />}
     </div>
   );
 }

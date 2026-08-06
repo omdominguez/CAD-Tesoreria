@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CreditCard, Building2, Banknote, Lock, Globe2, MapPin, Coins, Layers, ChevronDown, Pencil } from "lucide-react";
+import { CreditCard, Building2, Banknote, Lock, Globe2, MapPin, Coins, Layers, ChevronDown, Pencil, FileText } from "lucide-react";
 
 // Tema y utilidades
 import { C, TIPOS_MOV } from "../../constants/theme";
@@ -49,8 +49,12 @@ export default function CuentasPorPagar({ st, act, rol }) {
   // Filtrado y ordenamiento cronológico
   const listaBase = (st.compromisos || []).filter((c) => {
     if (c.anulado) return false;
-    if (filtro === "PENDIENTES") return pendienteDe(st, c) > 0.005;
-    if (filtro === "SIN_BANCO") return pendienteDe(st, c) > 0.005 && !c.bancoAsignadoId;
+    // El IVA sin factura fiscal del proveedor no se puede pagar todavía —
+    // no cuenta como "pendiente" ni "sin banco" hasta que llegue.
+    const facturaPendiente = c.esIva && !c.facturaRecibida;
+    if (filtro === "PENDIENTES") return pendienteDe(st, c) > 0.005 && !facturaPendiente;
+    if (filtro === "SIN_BANCO") return pendienteDe(st, c) > 0.005 && !c.bancoAsignadoId && !facturaPendiente;
+    if (filtro === "FALTA_FACTURA") return facturaPendiente && pendienteDe(st, c) > 0.005;
     if (filtro === "PAGADOS") return estadoDe(st, c) === "PAGADO";
     return true;
   }).sort((a, b) => (a.fechaVencimiento || "").localeCompare(b.fechaVencimiento || ""));
@@ -107,6 +111,7 @@ export default function CuentasPorPagar({ st, act, rol }) {
           options={[
             { id: "PENDIENTES", label: "Pendientes" },
             { id: "SIN_BANCO", label: "Sin banco" },
+            { id: "FALTA_FACTURA", label: "Falta por factura" },
             { id: "PAGADOS", label: "Pagados" },
             { id: "TODOS", label: "Todos" }
           ]} 
@@ -191,10 +196,20 @@ export default function CuentasPorPagar({ st, act, rol }) {
                           <Badge tone="rojo">Sin asignar</Badge>
                         )}
                       </Td>
-                      <Td><Badge tone={tone}>{e}</Badge></Td>
+                      <Td>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                          <Badge tone={tone}>{e}</Badge>
+                          {c.esIva && !c.facturaRecibida && <Badge tone="mut">Falta por factura</Badge>}
+                        </div>
+                      </Td>
                       <Td right>
                         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                          {puedeTeso && e !== "PAGADO" && !isEnCorrida && (
+                          {c.esIva && !c.facturaRecibida && puedeTeso && (
+                            <Btn small variant="soft" title="Marcar que el proveedor ya facturó este IVA" onClick={() => act.marcarFacturaIva(c.id, true)}>
+                              <FileText size={13} /> Factura recibida
+                            </Btn>
+                          )}
+                          {puedeTeso && e !== "PAGADO" && !isEnCorrida && !(c.esIva && !c.facturaRecibida) && (
                             <>
                               <Btn small variant="ghost" title="Asignar banco y cuenta destino" onClick={() => abrirAsignacion(c)}>
                                 <Building2 size={13} /> Banco

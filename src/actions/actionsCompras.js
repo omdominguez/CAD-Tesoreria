@@ -70,6 +70,37 @@ export function crearAccionesCompras(setSt, userId) {
       });
     },
     /**
+     * El proveedor emitió (o no) la factura fiscal del IVA de una compra
+     * discriminada. Mientras no llega, ese IVA no cuenta como "por pagar"
+     * (ver utils/finance.js → activo()) aunque el compromiso ya exista.
+     */
+    marcarFacturaIva: (id, recibida) => {
+      setSt((prev) => {
+        const next = {
+          ...prev,
+          compromisos: (prev.compromisos || []).map((c) => (c.id === id ? { ...c, facturaRecibida: recibida } : c))
+        };
+        saveState(next, userId).catch(console.error);
+        return next;
+      });
+    },
+    /**
+     * Edición directa de un compromiso ya creado (solo Master, para
+     * corregir errores como una fecha de vencimiento o un monto mal
+     * tipeado). No reversa ni recalcula nada más — solo pisa los campos
+     * indicados.
+     */
+    editarCompromiso: (id, cambios) => {
+      setSt((prev) => {
+        const next = {
+          ...prev,
+          compromisos: (prev.compromisos || []).map((c) => (c.id === id ? { ...c, ...cambios } : c))
+        };
+        saveState(next, userId).catch(console.error);
+        return next;
+      });
+    },
+    /**
      * Migración de un solo uso: a las compras financiadas creadas ANTES de
      * que existiera grupoFinanciamientoId (cuotas sueltas sin identificador
      * compartido), les asigna uno retroactivamente agrupándolas por mismo

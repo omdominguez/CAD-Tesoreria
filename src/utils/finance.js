@@ -349,7 +349,39 @@ export function estadoDe(st, c) {
   return "PENDIENTE";
 }
 
-export const activo = (st, c) => !c.anulado && ["PENDIENTE", "PARCIAL"].includes(estadoDe(st, c));
+/**
+ * Un compromiso cuenta como "activo" (por pagar de verdad) si no está
+ * anulado, está PENDIENTE/PARCIAL, Y —si es el IVA de una compra
+ * discriminada— el proveedor ya emitió la factura fiscal. Por ley, el IVA
+ * no se puede pagar hasta que exista esa factura, así que mientras
+ * "facturaRecibida" sea false no debe aparecer en el Tablero, Cuentas por
+ * Pagar (Pendientes) ni ninguna agenda de pagos.
+ */
+export const activo = (st, c) => !c.anulado && !(c.esIva && !c.facturaRecibida) && ["PENDIENTE", "PARCIAL"].includes(estadoDe(st, c));
+
+/**
+ * Clave que agrupa a TODOS los compromisos que pertenecen al mismo pedido
+ * real de compra (sus cuotas + su IVA aparte, si lo tiene) — se usa tanto
+ * para agrupar el estado de cuenta como para el seguimiento de entregas.
+ * Prioriza el número de pedido de Odoo; si no hay, cae al grupo de
+ * financiamiento; si tampoco hay (compra simple sin pedido), usa su propio id.
+ */
+export const claveEntregaDe = (c) => c.numeroPedidoOdoo || c.grupoFinanciamientoId || c.id;
+
+/**
+ * Estado de entrega de un pedido a partir de su registro en st.entregas:
+ * "COMPLETO" si se marcó manualmente, "PARCIAL" si hay eventos cargados
+ * pero no se ha marcado completo, "PENDIENTE" si no hay nada registrado
+ * todavía. No se calcula por cantidades — el sistema no guarda las líneas
+ * de producto de cada pedido, así que la confirmación es cualitativa.
+ */
+export function estadoEntregaDe(st, clave) {
+  const reg = (st.entregas || {})[clave];
+  if (!reg) return "PENDIENTE";
+  if (reg.completo) return "COMPLETO";
+  if ((reg.eventos || []).length > 0) return "PARCIAL";
+  return "PENDIENTE";
+}
 
 // Tasa histórica del registro para evitar fluctuaciones en la deuda pasada
 /**

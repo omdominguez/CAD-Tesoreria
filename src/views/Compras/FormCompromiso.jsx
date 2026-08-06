@@ -41,6 +41,7 @@ export default function FormCompromiso({ st, proveedores, act, onSave, onClose }
     ivaPct: "16",
     ivaFecha: new Date().toISOString().slice(0, 10), // vencimiento del IVA (se sincroniza con fechaPedido si no se toca a mano)
     ivaPagada: false,
+    ivaFacturaRecibida: false, // el proveedor casi nunca factura el IVA el mismo día del pedido
     adjuntos: [] 
   });
 
@@ -143,7 +144,9 @@ export default function FormCompromiso({ st, proveedores, act, onSave, onClose }
         formaPago: "BS_BCV",
         tasaBcvRegistro: tasaBCVPedido,
         fechaVencimiento: f.ivaFecha || f.fechaPedido,
-        grupoFinanciamientoId: grupoFinanciamientoId || null
+        grupoFinanciamientoId: grupoFinanciamientoId || null,
+        esIva: true,
+        facturaRecibida: f.ivaFacturaRecibida
       },
       anticipo: f.ivaPagada ? {
         monto: ivaBs,
@@ -381,6 +384,23 @@ export default function FormCompromiso({ st, proveedores, act, onSave, onClose }
                 No hay tasa BCV cargada para el {f.fechaPedido}. Carga el historial en Ajustes → Tasas para poder calcular el IVA en Bs.
               </div>
             )}
+
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 12, fontSize: 12, fontWeight: 600, color: C.ink, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={f.ivaFacturaRecibida}
+                onChange={(e) => setF({ ...f, ivaFacturaRecibida: e.target.checked })}
+                style={{ marginTop: 2 }}
+              />
+              <span>
+                El proveedor ya emitió la factura fiscal de este IVA
+                <div style={{ fontSize: 11, color: C.mut, fontWeight: 400, marginTop: 2 }}>
+                  {f.ivaFacturaRecibida
+                    ? "Este IVA ya cuenta como por pagar en Cuentas por Pagar y en el Tablero."
+                    : "Por defecto queda como \"Falta por factura\": no puede pagarse hasta que llegue, así que NO aparece todavía en Cuentas por Pagar ni en el Tablero — pero el compromiso ya queda registrado."}
+                </div>
+              </span>
+            </label>
 
             <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 12, fontWeight: 600, color: C.ink, cursor: "pointer" }}>
               <input type="checkbox" checked={f.ivaPagada} onChange={(e) => setF({ ...f, ivaPagada: e.target.checked })} />

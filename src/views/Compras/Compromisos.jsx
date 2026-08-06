@@ -1,5 +1,5 @@
 import React, { useState, Fragment } from "react";
-import { FileText, CalendarClock, CalendarDays, Plus, Paperclip, Trash2, ChevronDown, Layers, Pencil } from "lucide-react";
+import { FileText, CalendarClock, CalendarDays, Truck, Plus, Paperclip, Trash2, ChevronDown, Layers, Pencil } from "lucide-react";
 
 // Tema y Finanzas
 import { C } from "../../constants/theme";
@@ -15,6 +15,7 @@ import {
   agruparYColapsarCompromisos
 } from "../../utils/finance";
 import { usePaged } from "../../hooks/usePaged";
+import SeguimientoEntregas from "./SeguimientoEntregas";
 
 // Componentes UI
 import { Section, Card, Empty, Modal } from "../../components/ui/Layout";
@@ -79,7 +80,8 @@ export default function Compromisos({ st, act, rol }) {
           options={[
             { id: "lista", label: "Lista de pedidos", icon: FileText }, 
             { id: "agenda", label: "Agenda de pagos", icon: CalendarClock },
-            { id: "calendario", label: "Calendario", icon: CalendarDays }
+            { id: "calendario", label: "Calendario", icon: CalendarDays },
+            { id: "entregas", label: "Seguimiento de entregas", icon: Truck }
           ]} 
         />
         {vista === "lista" && (
@@ -258,10 +260,12 @@ export default function Compromisos({ st, act, rol }) {
 
       {/* Vista de Calendario */}
       {vista === "calendario" && <CalendarioPagos st={st} />}
+      {vista === "entregas" && <SeguimientoEntregas st={st} act={act} />}
 
       {/* Modales */}
       {modal === "new" && (
         <FormCompromiso 
+          st={st}
           proveedores={proveedores}
           act={act}
           onSave={(listaDeCuotas) => {

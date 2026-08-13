@@ -8,7 +8,23 @@ import { supabase } from "../supabase.js";
 async function llamarIA(modo, datos) {
   try {
     const { data, error } = await supabase.functions.invoke("ai-asistente", { body: { modo, ...datos } });
-    if (error) throw error;
+
+    if (error) {
+      // Cuando la función responde con un error HTTP (ej. 500), el cliente
+      // de Supabase lanza un mensaje genérico ("Edge Function returned a
+      // non-2xx status code") ANTES de leer el detalle real que la función
+      // sí manda en el cuerpo de la respuesta — hay que ir a buscarlo a
+      // error.context (la respuesta cruda), si está disponible.
+      let detalle = error.message;
+      try {
+        const cuerpo = await error.context?.json?.();
+        if (cuerpo?.error) detalle = cuerpo.error;
+      } catch {
+        // el cuerpo no era JSON legible — nos quedamos con el mensaje genérico
+      }
+      throw new Error(detalle);
+    }
+
     if (!data.ok) throw new Error(data.error || "Error desconocido de la IA");
     return data;
   } catch (e) {

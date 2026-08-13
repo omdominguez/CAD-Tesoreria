@@ -83,6 +83,12 @@ export default function ControlCostos({ st }) {
           <ResumenIA
             titulo={`Control de Costos por Categoría (${desde} a ${hasta})`}
             datos={{ totalUSD: resultado.totalUSD, cantidad: resultado.cantidad, porCategoria: resultado.porCategoria }}
+            nombreArchivo={`control_costos_${desde}_${hasta}`}
+            tablasPdf={[{
+              titulo: "Gasto por categoría",
+              columnas: ["Categoría", "Pedidos", "Total (USD)", "% del gasto"],
+              filas: resultado.porCategoria.map((c) => [c.categoria, c.cantidad, `$ ${c.totalUSD.toFixed(2)}`, `${c.pct.toFixed(1)}%`])
+            }]}
           />
 
           <Card style={{ padding: 18, marginBottom: 18 }}>

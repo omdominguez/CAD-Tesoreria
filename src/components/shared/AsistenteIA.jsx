@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Sparkles, X, Send, Loader2 } from "lucide-react";
+import { Sparkles, X, Send, Leaf } from "lucide-react";
 
 import { C, FONTS } from "../../constants/theme";
 import { construirResumenFinanciero } from "../../utils/resumenFinanciero";
@@ -11,6 +11,9 @@ import { preguntarIA } from "../../utils/iaCliente";
  * pregunta se manda junto con un resumen curado de los datos reales
  * (utils/resumenFinanciero.js) — no el estado completo — para que la IA
  * responda con datos reales sin exponer todo el detalle línea por línea.
+ *
+ * Diseño con la paleta de marca CAD: Navy como ancla (encabezado y
+ * burbujas propias), verde agro y naranja energía como acentos.
  */
 export default function AsistenteIA({ st }) {
   const [abierto, setAbierto] = useState(false);
@@ -22,8 +25,8 @@ export default function AsistenteIA({ st }) {
   const finRef = useRef(null);
 
   useEffect(() => {
-    finRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [mensajes, abierto]);
+    finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [mensajes, abierto, cargando]);
 
   const enviar = async () => {
     const texto = pregunta.trim();
@@ -44,15 +47,35 @@ export default function AsistenteIA({ st }) {
 
   return (
     <>
+      {/* Animaciones propias del widget: pulso del botón y puntos de "escribiendo" */}
+      <style>{`
+        @keyframes cadIaPulso {
+          0%, 100% { box-shadow: 0 6px 20px rgba(1,45,55,0.28), 0 0 0 0 rgba(31,170,94,0.35); }
+          50% { box-shadow: 0 6px 20px rgba(1,45,55,0.28), 0 0 0 8px rgba(31,170,94,0); }
+        }
+        @keyframes cadIaPunto {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+          40% { transform: translateY(-3px); opacity: 1; }
+        }
+        @keyframes cadIaAparecer {
+          from { opacity: 0; transform: translateY(10px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
+
       <button
         onClick={() => setAbierto((v) => !v)}
         style={{
           position: "fixed", bottom: 22, right: 22, zIndex: 60,
-          width: 52, height: 52, borderRadius: "50%", border: "none",
-          background: C.gold, color: "#fff", cursor: "pointer",
+          width: 56, height: 56, borderRadius: "50%", border: "none",
+          background: `linear-gradient(135deg, ${C.verde}, ${C.navy})`,
+          color: "#fff", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 6px 18px rgba(0,0,0,0.22)"
+          animation: abierto ? "none" : "cadIaPulso 2.4s ease-in-out infinite",
+          transition: "transform .15s ease"
         }}
+        onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.94)")}
+        onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
         title="Preguntar al asistente de IA"
       >
         {abierto ? <X size={22} /> : <Sparkles size={22} />}
@@ -61,56 +84,125 @@ export default function AsistenteIA({ st }) {
       {abierto && (
         <div
           style={{
-            position: "fixed", bottom: 86, right: 22, zIndex: 60,
-            width: 360, maxHeight: 480, display: "flex", flexDirection: "column",
-            background: C.surface, borderRadius: 16, border: `1px solid ${C.line}`,
-            boxShadow: "0 20px 50px rgba(0,0,0,0.25)", overflow: "hidden"
+            position: "fixed", bottom: 88, right: 22, zIndex: 60,
+            width: 372, maxHeight: 500, display: "flex", flexDirection: "column",
+            background: C.surface, borderRadius: 18, border: `1px solid ${C.line}`,
+            boxShadow: "0 24px 60px rgba(1,45,55,0.22)", overflow: "hidden",
+            animation: "cadIaAparecer .18s ease-out"
           }}
         >
-          <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.line}`, display: "flex", alignItems: "center", gap: 8 }}>
-            <Sparkles size={15} color={C.gold} />
-            <span style={{ fontFamily: FONTS.SANS, fontWeight: 700, fontSize: 13.5, color: C.ink }}>Asistente CAD-Tesorería</span>
+          {/* Encabezado con degradado de marca */}
+          <div
+            style={{
+              padding: "14px 16px", display: "flex", alignItems: "center", gap: 10,
+              background: `linear-gradient(120deg, ${C.navy}, ${C.navySoft})`
+            }}
+          >
+            <div style={{
+              width: 32, height: 32, borderRadius: 10, background: "rgba(255,255,255,0.14)",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+            }}>
+              <Leaf size={16} color={C.verde} strokeWidth={2.3} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: FONTS.SANS, fontWeight: 700, fontSize: 13.5, color: "#fff", letterSpacing: -0.1 }}>
+                Asistente CAD-Tesorería
+              </div>
+              <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.62)", marginTop: 1 }}>
+                Impulsado por IA · datos en vivo
+              </div>
+            </div>
+            <button
+              onClick={() => setAbierto(false)}
+              style={{ background: "none", border: "none", color: "rgba(255,255,255,0.75)", cursor: "pointer", padding: 4, display: "flex" }}
+            >
+              <X size={16} />
+            </button>
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Mensajes */}
+          <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 10, background: C.body }}>
             {mensajes.map((m, i) => (
               <div
                 key={i}
                 style={{
                   alignSelf: m.rol === "usuario" ? "flex-end" : "flex-start",
-                  maxWidth: "88%",
-                  padding: "8px 12px",
-                  borderRadius: 12,
+                  maxWidth: "86%",
+                  padding: "9px 13px",
                   fontSize: 12.8,
-                  lineHeight: 1.45,
+                  lineHeight: 1.48,
                   whiteSpace: "pre-wrap",
-                  background: m.rol === "usuario" ? C.navy : m.rol === "error" ? C.rojoSoft : C.body,
-                  color: m.rol === "usuario" ? "#fff" : m.rol === "error" ? C.rojo : C.ink
+                  fontFamily: FONTS.SANS,
+                  ...(m.rol === "usuario"
+                    ? {
+                        background: `linear-gradient(135deg, ${C.navy}, ${C.navySoft})`,
+                        color: "#fff",
+                        borderRadius: "14px 14px 3px 14px"
+                      }
+                    : m.rol === "error"
+                    ? {
+                        background: C.rojoSoft,
+                        color: C.rojo,
+                        borderRadius: "14px 14px 14px 3px",
+                        border: `1px solid ${C.rojo}22`
+                      }
+                    : {
+                        background: C.surface,
+                        color: C.ink,
+                        borderRadius: "14px 14px 14px 3px",
+                        border: `1px solid ${C.line}`,
+                        borderLeft: `3px solid ${C.verde}`
+                      })
                 }}
               >
                 {m.texto}
               </div>
             ))}
+
             {cargando && (
-              <div style={{ alignSelf: "flex-start", padding: "8px 12px", color: C.mut, fontSize: 12.5, display: "flex", alignItems: "center", gap: 6 }}>
-                <Loader2 size={13} className="cad-spin" /> Pensando…
+              <div
+                style={{
+                  alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 5,
+                  padding: "10px 14px", borderRadius: "14px 14px 14px 3px",
+                  background: C.surface, border: `1px solid ${C.line}`, borderLeft: `3px solid ${C.gold}`
+                }}
+              >
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    style={{
+                      width: 6, height: 6, borderRadius: "50%", background: C.gold,
+                      display: "inline-block", animation: `cadIaPunto 1.1s ease-in-out ${i * 0.15}s infinite`
+                    }}
+                  />
+                ))}
               </div>
             )}
             <div ref={finRef} />
           </div>
 
-          <div style={{ display: "flex", gap: 8, padding: 10, borderTop: `1px solid ${C.line}` }}>
+          {/* Entrada */}
+          <div style={{ display: "flex", gap: 8, padding: 12, borderTop: `1px solid ${C.line}`, background: C.surface }}>
             <input
               value={pregunta}
               onChange={(e) => setPregunta(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && enviar()}
               placeholder="Preguntar algo…"
-              style={{ flex: 1, padding: "9px 12px", borderRadius: 10, border: `1px solid ${C.line}`, fontSize: 12.8, outline: "none" }}
+              style={{
+                flex: 1, padding: "10px 14px", borderRadius: 999, border: `1px solid ${C.line}`,
+                fontSize: 12.8, outline: "none", fontFamily: FONTS.SANS, background: C.body, color: C.ink
+              }}
             />
             <button
               onClick={enviar}
               disabled={cargando || !pregunta.trim()}
-              style={{ width: 36, borderRadius: 10, border: "none", background: C.gold, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: cargando || !pregunta.trim() ? 0.5 : 1 }}
+              style={{
+                width: 38, height: 38, borderRadius: "50%", border: "none",
+                background: cargando || !pregunta.trim() ? C.line : `linear-gradient(135deg, ${C.gold}, ${C.verde})`,
+                color: "#fff", cursor: cargando || !pregunta.trim() ? "default" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                transition: "opacity .15s"
+              }}
             >
               <Send size={15} />
             </button>

@@ -39,7 +39,17 @@ async function llamarOdoo(url: string, service: string, method: string, args: un
   return json.result;
 }
 
-Deno.serve(async (_req) => {
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS"
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   try {
     const url = Deno.env.get("ODOO_URL");
     const db = Deno.env.get("ODOO_DB");
@@ -56,7 +66,7 @@ Deno.serve(async (_req) => {
     if (faltantes.length > 0) {
       return new Response(
         JSON.stringify({ ok: false, error: `Faltan estas variables en Supabase → Edge Functions → Secrets: ${faltantes.join(", ")}` }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
+        { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
 
@@ -69,7 +79,7 @@ Deno.serve(async (_req) => {
     if (!uid) {
       return new Response(
         JSON.stringify({ ok: false, error: "Odoo respondió, pero el usuario/API Key no son válidos para esa base de datos. Revisa ODOO_DB, ODOO_LOGIN y ODOO_API_KEY." }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
+        { status: 401, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
       );
     }
 
@@ -80,12 +90,12 @@ Deno.serve(async (_req) => {
         version: version?.server_version || version,
         uid
       }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
+      { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
     );
   } catch (err) {
     return new Response(
       JSON.stringify({ ok: false, error: String(err?.message || err) }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
     );
   }
 });

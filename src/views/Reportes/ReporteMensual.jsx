@@ -68,6 +68,25 @@ export default function ReporteMensual({ st }) {
           compras: reporte.compras, pagos: reporte.pagos, ventas: reporte.ventas, cobros: reporte.cobros,
           balanceNeto: reporte.balanceNeto, porCategoria: reporte.porCategoria
         }}
+        nombreArchivo={`informe_ia_${reporte.etiqueta.replace(" ", "_").toLowerCase()}`}
+        tablasPdf={[
+          {
+            titulo: "Resumen del mes",
+            columnas: ["", "Cantidad", "Total (USD)"],
+            filas: [
+              ["Compras registradas", reporte.compras.cantidad, `$ ${reporte.compras.totalUSD.toFixed(2)}`],
+              ["Pagos realizados", reporte.pagos.cantidad, `$ ${reporte.pagos.totalUSD.toFixed(2)}`],
+              ["Facturas de venta", reporte.ventas.cantidad, `$ ${reporte.ventas.totalUSD.toFixed(2)}`],
+              ["Cobros recibidos", reporte.cobros.cantidad, `$ ${reporte.cobros.totalUSD.toFixed(2)}`]
+            ]
+          },
+          ...(reporte.porCategoria.length ? [{
+            titulo: "Compras por categoría",
+            columnas: ["Categoría", "Total (USD)"],
+            colorEncabezado: [100, 100, 100],
+            filas: reporte.porCategoria.map((c) => [c.categoria, `$ ${c.totalUSD.toFixed(2)}`])
+          }] : [])
+        ]}
       />
 
       <Card style={{ padding: 0, marginBottom: 20, overflow: "hidden" }}>

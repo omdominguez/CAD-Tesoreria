@@ -266,6 +266,87 @@ export async function exportarReporteMensualPDF(reporte) {
 }
 
 /** Excel multi-hoja del resumen financiero mensual. */
+/**
+ * PDF con la identidad de marca de CAD que incluye el párrafo redactado
+ * por la IA como cuerpo del informe, seguido de las tablas de datos que
+ * lo respaldan — la IA solo pone el texto, los números y el diseño los
+ * sigue manejando el sistema (mismo patrón de logo/colores que el resto
+ * de los reportes, para que no se note que viene de otro lado).
+ *
+ * @param titulo       encabezado del informe (ej. "Informe Ejecutivo — Julio 2026")
+ * @param textoIA      el párrafo generado por la IA (texto plano, sin Markdown)
+ * @param tablas       [{ titulo, columnas: [string], filas: [[..]], colorEncabezado?: [r,g,b] }]
+ * @param nombreArchivo nombre del archivo sin extensión
+ */
+export async function exportarInformeIA(titulo, textoIA, tablas, nombreArchivo) {
+  const { jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+  const doc = new jsPDF();
+
+  const NAVY = [1, 45, 55];
+  const VERDE = [0, 135, 71];
+  const GRIS = [120, 120, 120];
+  let y = 18;
+
+  const LOGO_ANCHO = 34;
+  const LOGO_ALTO = LOGO_ANCHO / (2572 / 1135);
+  doc.addImage(LOGO_CAD_VENEZUELA, "PNG", 14, y - 8, LOGO_ANCHO, LOGO_ALTO);
+  y += LOGO_ALTO + 4;
+
+  doc.setFontSize(9);
+  doc.setTextColor(...GRIS);
+  doc.text("Comercializadora Agrícola Domínguez, C.A. · RIF J-30386970-0", 14, y);
+  y += 10;
+
+  doc.setDrawColor(...NAVY);
+  doc.setLineWidth(0.6);
+  doc.line(14, y, 196, y);
+  y += 10;
+
+  doc.setFontSize(15);
+  doc.setTextColor(20, 20, 20);
+  doc.text(titulo, 14, y);
+  y += 6;
+
+  doc.setFontSize(8);
+  doc.setTextColor(...GRIS);
+  doc.text("Redactado por IA a partir de los datos del sistema — revisa las cifras contra las tablas de abajo.", 14, y);
+  y += 10;
+
+  // Párrafo de la IA, respetando saltos de línea y ajustando el ancho a la página
+  if (textoIA) {
+    doc.setFontSize(10.5);
+    doc.setTextColor(30, 30, 30);
+    const lineasEnvueltas = doc.splitTextToSize(textoIA, 182);
+    doc.text(lineasEnvueltas, 14, y);
+    y += lineasEnvueltas.length * 5.2 + 10;
+  }
+
+  (tablas || []).forEach((t) => {
+    if (y > 250) { doc.addPage(); y = 20; }
+    if (t.titulo) {
+      doc.setFontSize(11);
+      doc.setTextColor(20, 20, 20);
+      doc.text(t.titulo, 14, y);
+      y += 5;
+    }
+    autoTable(doc, {
+      startY: y + 2,
+      head: [t.columnas],
+      body: t.filas,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: t.colorEncabezado || VERDE }
+    });
+    y = doc.lastAutoTable.finY + 12;
+  });
+
+  doc.setFontSize(8);
+  doc.setTextColor(...GRIS);
+  doc.text(`Generado digitalmente el ${new Date().toLocaleDateString("es-VE")} · CAD Tesorería + IA`, 14, 290);
+
+  doc.save(`${nombreArchivo}.pdf`);
+}
+
 export async function exportarReporteMensualExcel(reporte) {
   const XLSX = await import("xlsx");
   const libro = XLSX.utils.book_new();

@@ -23,6 +23,7 @@ import { crearAccionesVentas } from "./actionsVentas";
 import { crearAccionesConciliacion } from "./actionsConciliacion";
 import { crearAccionesPermisos } from "./actionsPermisos";
 import { crearAccionesEntregas } from "./actionsEntregas";
+import { crearAccionesOdoo } from "./actionsOdoo";
 
 /**
  * Arma el objeto `act` completo que usa toda la app.
@@ -41,5 +42,6 @@ export function crearAcciones(setSt, userId) {
     ...crearAccionesConciliacion(setSt, userId),
     ...crearAccionesPermisos(setSt, userId),
     ...crearAccionesEntregas(setSt, userId),
+    ...crearAccionesOdoo(setSt, userId),
   };
 }

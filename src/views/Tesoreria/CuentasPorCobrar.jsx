@@ -176,7 +176,17 @@ export default function CuentasPorCobrar({ st, act, rol }) {
                         <div style={{ fontWeight: 700 }}>{provNom(st, c.clienteId)}</div>
                         <div style={{ fontSize: 11.5, color: C.mut }}>{c.descripcion || "—"}</div>
                       </Td>
-                      <Td>{c.numeroFactura || <span style={{ color: C.mut }}>—</span>}</Td>
+                      <Td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {c.numeroFactura || <span style={{ color: C.mut }}>—</span>}
+                          {c.origenOdoo && <Badge tone="azul">Odoo</Badge>}
+                          {c.tasaConversionOdoo && (
+                            <Badge tone="amar" title={`Registrado en Odoo como Bs ${c.montoOriginalOdoo?.toFixed(2)} — convertido a la tasa BCV ${c.tasaConversionOdoo.toFixed(2)} del día del pedido`}>
+                              Bs→$
+                            </Badge>
+                          )}
+                        </div>
+                      </Td>
                       <Td>{fmtD(c.fechaVencimiento)}</Td>
                       <Td right>{money(c.montoOriginal, c.moneda)}</Td>
                       <Td right>

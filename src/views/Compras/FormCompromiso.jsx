@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Sparkles, Loader2 } from "lucide-react";
 
 // Tema y utilidades
 import { C, CLASIF } from "../../constants/theme";
 import { money, FORMAS_PAGO, tasaSegunFormaPagoEnFecha } from "../../utils/finance";
+import { categorizarConIA } from "../../utils/iaCliente";
 
 // Componentes UI
 import { Modal } from "../../components/ui/Layout";
@@ -18,6 +19,7 @@ export default function FormCompromiso({ st, proveedores, act, onSave, onClose }
   // (mientras el resto de la app se sincroniza con Supabase de fondo).
   const [proveedoresLocal, setProveedoresLocal] = useState(proveedores);
   const [sugerenciaNueva, setSugerenciaNueva] = useState(null); // { nombre, rif } detectado sin match
+  const [sugiriendoCategoria, setSugiriendoCategoria] = useState(false);
 
   const [f, setF] = useState({ 
     proveedorId: proveedores[0]?.id || "", 
@@ -291,9 +293,25 @@ export default function FormCompromiso({ st, proveedores, act, onSave, onClose }
           />
         </Field>
         <Field label="Categoría">
-          <Select value={f.categoria} onChange={(e) => setF({ ...f, categoria: e.target.value })}>
-            {CLASIF.map((x) => <option key={x} value={x}>{x}</option>)}
-          </Select>
+          <div style={{ display: "flex", gap: 6 }}>
+            <Select value={f.categoria} onChange={(e) => setF({ ...f, categoria: e.target.value })} style={{ flex: 1 }}>
+              {CLASIF.map((x) => <option key={x} value={x}>{x}</option>)}
+            </Select>
+            <Btn
+              small
+              variant="ghost"
+              title="Sugerir categoría con IA a partir de la descripción"
+              disabled={!f.descripcion?.trim() || sugiriendoCategoria}
+              onClick={async () => {
+                setSugiriendoCategoria(true);
+                const r = await categorizarConIA(f.descripcion, CLASIF);
+                if (r.ok && r.categoria) setF((prev) => ({ ...prev, categoria: r.categoria }));
+                setSugiriendoCategoria(false);
+              }}
+            >
+              {sugiriendoCategoria ? <Loader2 size={13} className="cad-spin" /> : <Sparkles size={13} />}
+            </Btn>
+          </div>
         </Field>
         <Field label="Forma de pago (informativo)">
           <Select value={f.formaPago} onChange={(e) => setF({ ...f, formaPago: e.target.value })}>

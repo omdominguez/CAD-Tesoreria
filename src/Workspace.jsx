@@ -39,6 +39,7 @@ import ModuloAjustes from "./views/Ajustes/ModuloAjustes";
 import ModuloReportes from "./views/Reportes/ModuloReportes";
 import ModuloBanco from "./views/Banco/ModuloBanco";
 import { permisosEfectivos } from "./utils/permisos";
+import AsistenteIA from "./components/shared/AsistenteIA";
 
 export default function Workspace({ st, act }) {
   const { user, role, signOut } = useAuth();
@@ -236,6 +237,7 @@ export default function Workspace({ st, act }) {
           )}
         </div>
       </MainContent>
+      <AsistenteIA st={st} />
     </AppShell>
   );
 }

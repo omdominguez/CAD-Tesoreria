@@ -47,6 +47,7 @@ import { Btn } from "../../components/ui/Buttons";
 import { Badge } from "../../components/ui/Data";
 import ComportamientoTasas from "./ComportamientoTasas";
 import ProximosVencimientos from "./ProximosVencimientos";
+import { flujoRodante } from "../../utils/planificacion";
 import { AvatarBanco } from "../../components/shared/AvatarBanco";
 import { useIsMobile } from "../../hooks/useIsMobile";
 
@@ -243,13 +244,22 @@ const flechaEstilo = {
   cursor: "pointer"
 };
 
-export default function Tablero({ st, permisos }) {
+export default function Tablero({ st, permisos, onIr }) {
   const [semanas, setSemanas] = useState(12);
   const [estres, setEstres] = useState(false);
 
   // Flags de visibilidad según permisos (por defecto todo visible)
   const p = permisos || {};
   const verBancos = p.verBancos !== false;
+  const verPlanificacion = p.planificacion !== false;
+
+  // Alerta proactiva: mira 13 semanas adelante para avisar con tiempo si el
+  // efectivo se pondría en rojo, sin esperar a que alguien entre a revisar.
+  const alertaFlujo = useMemo(() => {
+    if (!verPlanificacion || !verBancos) return null;
+    const f = flujoRodante(st, 13);
+    return f.primeraSemanaNegativa ? f : null;
+  }, [st, verPlanificacion, verBancos]);
   const verVentas = p.ventas !== false;
   const verPagos = p.tesoreria !== false || p.compras === true;
 
@@ -339,6 +349,20 @@ export default function Tablero({ st, permisos }) {
 
   return (
     <Section title="Tablero Principal" eyebrow="Resumen general" desc="Vista consolidada de tu posición de caja, proyección de pagos y saldos por banco.">
+      {/* Alerta proactiva de flujo de caja a 13 semanas */}
+      {alertaFlujo && (
+        <Card style={{ padding: "12px 16px", marginBottom: 16, borderLeft: `3px solid ${C.rojo}`, background: C.rojoSoft, cursor: onIr ? "pointer" : "default" }} onClick={() => onIr && onIr("planificacion")}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <AlertTriangle size={17} color={C.rojo} style={{ flexShrink: 0 }} />
+            <div style={{ fontSize: 12.5, color: C.ink, flex: 1 }}>
+              <b>Alerta de flujo de caja:</b> con lo comprometido hoy, el saldo proyectado se pondría en rojo en la{" "}
+              <b>Semana {alertaFlujo.primeraSemanaNegativa}</b> (hasta {money(alertaFlujo.montoMinimoNegativo, "USD")}).
+            </div>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: C.rojo, whiteSpace: "nowrap" }}>Ver Planificación →</span>
+          </div>
+        </Card>
+      )}
+
       {/* 0. Lectura rápida de cobertura */}
       {verBancos && cobertura && (
         <Card style={{ padding: "14px 18px", marginBottom: 16, borderLeft: `3px solid ${cobertura.tono}` }}>

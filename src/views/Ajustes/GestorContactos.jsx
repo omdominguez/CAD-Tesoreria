@@ -11,6 +11,7 @@ import { Btn, Segmented } from "../../components/ui/Buttons";
 import { Field, Input, Select } from "../../components/ui/Forms";
 import { Th, Td } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Data";
+import PosiblesDuplicados from "./PosiblesDuplicados";
 
 // Redes cripto más comunes para pagos a proveedores en Venezuela
 const REDES_CRIPTO = ["TRC20 (Tron)", "ERC20 (Ethereum)", "BEP20 (BSC)", "Polygon", "Bitcoin", "Solana"];
@@ -50,6 +51,8 @@ export default function GestorContactos({ st, act }) {
         </Btn>
       }
     >
+      <PosiblesDuplicados proveedores={st.proveedores} />
+
       <div style={{ marginBottom: 12 }}>
         <Segmented 
           value={filtro} 

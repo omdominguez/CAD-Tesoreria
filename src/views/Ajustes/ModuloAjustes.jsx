@@ -37,7 +37,7 @@ export default function ModuloAjustes({ st, act, rol, meId }) {
       {sub === "bancos" && <Bancos st={st} act={act} rol={rol} />}
       {sub === "contactos" && <GestorContactos st={st} act={act} rol={rol} />}
       {sub === "equipo" && rol === "MASTER" && <Equipo meId={meId} st={st} act={act} />}
-      {sub === "odoo" && rol === "MASTER" && <IntegracionOdoo />}
+      {sub === "odoo" && rol === "MASTER" && <IntegracionOdoo st={st} act={act} />}
     </div>
   );
 }

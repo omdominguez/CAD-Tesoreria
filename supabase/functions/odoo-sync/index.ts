@@ -1,22 +1,20 @@
 // =====================================================================
 //  Edge Function: odoo-sync
 //  ---------------------------------------------------------------------
-//  PASO 2 de la integración con Odoo (después de confirmar con "odoo-test"
-//  que la conexión funciona). Esta función SOLO LEE de Odoo y devuelve la
-//  lista de pedidos de compra y facturas de venta recientes — todavía NO
-//  escribe nada en CAD-Tesorería. Es para revisar juntos que los campos
-//  (número, monto, fecha, RIF del contacto) calzan antes de conectar la
-//  escritura automática en compromisos / cuentas por cobrar.
+//  Lee de Odoo los pedidos de compra y facturas de venta recientes, junto
+//  con el RIF de cada contacto involucrado (para poder emparejarlos con
+//  los proveedores/clientes de CAD-Tesorería). Sigue siendo de SOLO
+//  LECTURA — la escritura real en CAD-Tesorería ocurre del lado del
+//  cliente (actions/actionsOdoo.js), después de que el usuario revisa la
+//  vista previa y confirma.
 //
 //  Modelos de Odoo consultados:
 //    - purchase.order   → pedidos de compra
 //    - account.move     → facturas, filtradas a move_type = 'out_invoice'
-//                         (factura de cliente) y state != 'cancel'
+//    - res.partner      → RIF (campo "vat") de cada contacto involucrado
 //
-//  Mismos secrets que odoo-test: ODOO_URL, ODOO_DB, ODOO_LOGIN, ODOO_API_KEY.
-//
-//  Parámetro opcional en la URL: ?dias=30 (por defecto 30) — cuántos días
-//  hacia atrás buscar, para no traer el histórico completo cada vez.
+//  Secrets: ODOO_URL, ODOO_DB, ODOO_LOGIN, ODOO_API_KEY.
+//  Parámetro opcional en la URL: ?dias=30 (por defecto 30).
 // =====================================================================
 
 async function llamarOdoo(url: string, service: string, method: string, args: unknown[]) {
@@ -72,12 +70,23 @@ Deno.serve(async (req) => {
       { fields: ["name", "partner_id", "amount_total", "amount_untaxed", "amount_tax", "invoice_date", "invoice_date_due", "state", "currency_id"], limit: 200, order: "invoice_date desc" }
     );
 
+    // --- Contactos: se busca el RIF (campo "vat" en Odoo) de cada partner_id
+    // que aparece en los pedidos/facturas, para poder emparejar cada uno con
+    // el proveedor/cliente correcto en CAD-Tesorería (que usa el RIF como
+    // llave, no el nombre — los nombres pueden venir escritos distinto).
+    const idsPartner = [...new Set([...pedidos, ...facturas].map((r) => r.partner_id?.[0]).filter(Boolean))];
+    let contactos: unknown[] = [];
+    if (idsPartner.length > 0) {
+      contactos = await execute("res.partner", "read", [idsPartner], { fields: ["name", "vat"] });
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
         rangoDesde: desde,
         pedidosCompra: { total: pedidos.length, muestra: pedidos },
-        facturasVenta: { total: facturas.length, muestra: facturas }
+        facturasVenta: { total: facturas.length, muestra: facturas },
+        contactos
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );

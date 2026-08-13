@@ -207,7 +207,17 @@ export default function Compromisos({ st, act, rol }) {
                               </div>
                             )}
                           </Td>
-                          <Td>{c.numeroPedidoOdoo || <span style={{ color: C.mut }}>—</span>}</Td>
+                          <Td>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              {c.numeroPedidoOdoo || <span style={{ color: C.mut }}>—</span>}
+                              {c.origenOdoo && <Badge tone="azul">Odoo</Badge>}
+                              {c.tasaConversionOdoo && (
+                                <Badge tone="amar" title={`Registrado en Odoo como Bs ${c.montoOriginalOdoo?.toFixed(2)} — convertido a la tasa BCV ${c.tasaConversionOdoo.toFixed(2)} del día del pedido`}>
+                                  Bs→$
+                                </Badge>
+                              )}
+                            </div>
+                          </Td>
                           <Td>{fmtD(c.fechaVencimiento)}</Td>
                           <Td right>{money(c.montoOriginal, c.moneda)}</Td>
                           <Td right>

@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef } from "react";
-import { Landmark, ArrowUpRight, ArrowDownLeft, CheckCircle2, Circle, ClipboardCheck, Plus, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Landmark, ArrowUpRight, ArrowDownLeft, CheckCircle2, Circle, ClipboardCheck, Plus, Trash2, Search, ChevronLeft, ChevronRight, Upload, FileSpreadsheet, AlertTriangle, HelpCircle } from "lucide-react";
 
 import { C, FONTS } from "../../constants/theme";
 import { money, fmtD, construirLedgerBanco, bancosOrdenados, brutoUSD } from "../../utils/finance";
+import { leerArchivoEstadoCuenta, normalizarLineasBanco, emparejarConciliacion } from "../../utils/conciliacionBancaria";
 import { exportarCSV, exportarExcel, exportarPDF } from "../../utils/exportar";
 import { usePaged } from "../../hooks/usePaged";
 
@@ -29,6 +30,7 @@ export default function ModuloBanco({ st, act, rol, usuario }) {
   const [busqueda, setBusqueda] = useState("");
   const [seleccion, setSeleccion] = useState([]);
   const [modalConciliacion, setModalConciliacion] = useState(false);
+  const [modalImportarEstado, setModalImportarEstado] = useState(false);
   const [verConciliacion, setVerConciliacion] = useState(null);
 
   const bancoSel = bancos.find((b) => b.id === bancoId);
@@ -274,9 +276,12 @@ export default function ModuloBanco({ st, act, rol, usuario }) {
       ) : (
         <>
           {puedeConciliar && (
-            <div style={{ marginBottom: 14 }}>
+            <div style={{ marginBottom: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Btn onClick={() => setModalConciliacion(true)}>
                 <Plus size={15} /> Nueva conciliación
+              </Btn>
+              <Btn variant="ghost" onClick={() => setModalImportarEstado(true)}>
+                <Upload size={15} /> Importar balance bancario
               </Btn>
             </div>
           )}
@@ -336,6 +341,16 @@ export default function ModuloBanco({ st, act, rol, usuario }) {
           usuario={usuario}
           onClose={() => setModalConciliacion(false)}
           onSave={(registro) => { act.guardarConciliacion(registro); setModalConciliacion(false); }}
+        />
+      )}
+
+      {modalImportarEstado && (
+        <ImportarEstadoCuentaModal
+          banco={bancoSel}
+          ledgerCompleto={ledgerCompleto}
+          act={act}
+          onClose={() => setModalImportarEstado(false)}
+          onTerminar={() => { setModalImportarEstado(false); setModalConciliacion(true); }}
         />
       )}
 
@@ -578,3 +593,345 @@ const flechaBancoEstilo = {
   cursor: "pointer",
   flexShrink: 0
 };
+/* ============================================================
+   IMPORTAR BALANCE BANCARIO — emparejamiento automático
+   ------------------------------------------------------------
+   Lee el estado de cuenta exportado del banco (CSV/Excel), deja
+   elegir qué columna es cuál, y empareja cada línea contra los
+   movimientos del sistema aún no conciliados. Los emparejamientos
+   ambiguos o sin coincidencia quedan para revisión manual — nunca
+   se fuerza una conciliación automática dudosa.
+   ============================================================ */
+function ImportarEstadoCuentaModal({ banco, ledgerCompleto, act, onClose, onTerminar }) {
+  const [paso, setPaso] = useState(0); // 0: archivo + mapeo · 1: resultados
+  const [nombreArchivo, setNombreArchivo] = useState("");
+  const [filasCrudas, setFilasCrudas] = useState(null); // incluye la fila de encabezados en [0]
+  const [errorArchivo, setErrorArchivo] = useState(null);
+  const [leyendo, setLeyendo] = useState(false);
+
+  const [modoMonto, setModoMonto] = useState("UNICA"); // "UNICA" | "DEBCRED"
+  const [colFecha, setColFecha] = useState(null);
+  const [colDescripcion, setColDescripcion] = useState(null);
+  const [colMonto, setColMonto] = useState(null);
+  const [colDebito, setColDebito] = useState(null);
+  const [colCredito, setColCredito] = useState(null);
+  const [toleranciaDias, setToleranciaDias] = useState(3);
+
+  const [resultado, setResultado] = useState(null);
+  const [aplicados, setAplicados] = useState(new Set()); // ids de movimiento ya marcados en esta sesión
+  const [ambiguosResueltos, setAmbiguosResueltos] = useState({}); // { índice: movimientoId | "ninguno" }
+
+  const encabezados = filasCrudas ? filasCrudas[0] : [];
+  const datos = filasCrudas ? filasCrudas.slice(1) : [];
+
+  const adivinarColumna = (palabras) =>
+    encabezados.findIndex((h) => palabras.some((p) => String(h).toLowerCase().includes(p)));
+
+  const onArchivo = async (file) => {
+    if (!file) return;
+    setLeyendo(true);
+    setErrorArchivo(null);
+    setNombreArchivo(file.name);
+    try {
+      const filas = await leerArchivoEstadoCuenta(file);
+      if (filas.length < 2) throw new Error("El archivo no tiene filas suficientes (se espera un encabezado + datos).");
+      setFilasCrudas(filas);
+
+      const hdrs = filas[0];
+      const guess = (palabras) => hdrs.findIndex((h) => palabras.some((p) => String(h).toLowerCase().includes(p)));
+      const iFecha = guess(["fecha", "date"]);
+      const iDesc = guess(["descrip", "concepto", "detalle", "referencia", "memo"]);
+      const iDeb = guess(["debito", "débito", "cargo", "egreso"]);
+      const iCred = guess(["credito", "crédito", "abono", "ingreso"]);
+      const iMonto = guess(["monto", "importe", "valor", "amount"]);
+
+      setColFecha(iFecha >= 0 ? iFecha : 0);
+      setColDescripcion(iDesc >= 0 ? iDesc : null);
+      if (iDeb >= 0 || iCred >= 0) {
+        setModoMonto("DEBCRED");
+        setColDebito(iDeb >= 0 ? iDeb : null);
+        setColCredito(iCred >= 0 ? iCred : null);
+      } else {
+        setModoMonto("UNICA");
+        setColMonto(iMonto >= 0 ? iMonto : null);
+      }
+    } catch (e) {
+      setErrorArchivo(e.message || "No se pudo leer el archivo.");
+      setFilasCrudas(null);
+    }
+    setLeyendo(false);
+  };
+
+  const listo = colFecha != null && (modoMonto === "UNICA" ? colMonto != null : colDebito != null || colCredito != null);
+
+  const emparejar = () => {
+    const lineas = normalizarLineasBanco(datos, { colFecha, colDescripcion, modoMonto, colMonto, colDebito, colCredito });
+    const pendientes = ledgerCompleto.filter((r) => !r.conciliado);
+    const res = emparejarConciliacion(lineas, pendientes, Number(toleranciaDias) || 3);
+    setResultado(res);
+    setAplicados(new Set());
+    setAmbiguosResueltos({});
+    setPaso(1);
+  };
+
+  const aplicarAutomaticos = () => {
+    resultado.matches.forEach((m) => {
+      act.marcarConciliado(m.movimiento.origen, m.movimiento.idOriginal, true);
+    });
+    setAplicados(new Set(resultado.matches.map((m) => m.movimiento.id)));
+  };
+
+  const resolverAmbiguo = (idx, movimiento) => {
+    if (movimiento) act.marcarConciliado(movimiento.origen, movimiento.idOriginal, true);
+    setAmbiguosResueltos((prev) => ({ ...prev, [idx]: movimiento ? movimiento.id : "ninguno" }));
+  };
+
+  const totalLineasBanco = resultado ? resultado.matches.length + resultado.ambiguos.length + resultado.sinMatchEnSistema.length : 0;
+
+  return (
+    <Modal title={`Importar balance bancario · ${banco?.nombre || ""}`} wide onClose={onClose}>
+      {paso === 0 && (
+        <>
+          <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 14, lineHeight: 1.5 }}>
+            Sube el estado de cuenta que exporta tu banco (CSV o Excel). El sistema va a comparar cada línea
+            contra los movimientos de <b>{banco?.nombre}</b> que todavía no están marcados como conciliados,
+            emparejándolos por monto exacto y fecha cercana.
+          </div>
+
+          <label
+            style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+              padding: "20px 14px", marginBottom: 16, border: `2px dashed ${C.line}`, borderRadius: 12,
+              background: C.body, cursor: leyendo ? "default" : "pointer", textAlign: "center"
+            }}
+          >
+            <input type="file" accept=".csv,.xls,.xlsx" hidden disabled={leyendo} onChange={(e) => onArchivo(e.target.files?.[0])} />
+            <FileSpreadsheet size={20} color={C.mut} />
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.ink }}>
+              {leyendo ? "Leyendo archivo…" : nombreArchivo || "Elegir archivo (.csv, .xls, .xlsx)"}
+            </div>
+            {filasCrudas && !leyendo && (
+              <div style={{ fontSize: 11, color: C.mut }}>{datos.length} fila(s) de datos detectadas</div>
+            )}
+          </label>
+
+          {errorArchivo && (
+            <div style={{ display: "flex", gap: 8, padding: "10px 12px", background: C.rojoSoft, borderRadius: 10, marginBottom: 14, fontSize: 12.5 }}>
+              <AlertTriangle size={15} color={C.rojo} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>{errorArchivo}</span>
+            </div>
+          )}
+
+          {filasCrudas && (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.ink, marginBottom: 8 }}>¿Qué columna es cuál?</div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 10 }}>
+                <Field label="Columna de fecha">
+                  <Select value={colFecha ?? ""} onChange={(e) => setColFecha(Number(e.target.value))}>
+                    {encabezados.map((h, i) => <option key={i} value={i}>{h || `Columna ${i + 1}`}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Columna de descripción (opcional)">
+                  <Select value={colDescripcion ?? ""} onChange={(e) => setColDescripcion(e.target.value === "" ? null : Number(e.target.value))}>
+                    <option value="">(ninguna)</option>
+                    {encabezados.map((h, i) => <option key={i} value={i}>{h || `Columna ${i + 1}`}</option>)}
+                  </Select>
+                </Field>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <Segmented
+                  value={modoMonto}
+                  onChange={setModoMonto}
+                  options={[{ id: "UNICA", label: "Una columna de monto" }, { id: "DEBCRED", label: "Columnas Débito y Crédito" }]}
+                />
+              </div>
+
+              {modoMonto === "UNICA" ? (
+                <Field label="Columna de monto (negativo = egreso)">
+                  <Select value={colMonto ?? ""} onChange={(e) => setColMonto(Number(e.target.value))}>
+                    <option value="">Elegir…</option>
+                    {encabezados.map((h, i) => <option key={i} value={i}>{h || `Columna ${i + 1}`}</option>)}
+                  </Select>
+                </Field>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <Field label="Columna de Débito / Cargo">
+                    <Select value={colDebito ?? ""} onChange={(e) => setColDebito(e.target.value === "" ? null : Number(e.target.value))}>
+                      <option value="">(ninguna)</option>
+                      {encabezados.map((h, i) => <option key={i} value={i}>{h || `Columna ${i + 1}`}</option>)}
+                    </Select>
+                  </Field>
+                  <Field label="Columna de Crédito / Abono">
+                    <Select value={colCredito ?? ""} onChange={(e) => setColCredito(e.target.value === "" ? null : Number(e.target.value))}>
+                      <option value="">(ninguna)</option>
+                      {encabezados.map((h, i) => <option key={i} value={i}>{h || `Columna ${i + 1}`}</option>)}
+                    </Select>
+                  </Field>
+                </div>
+              )}
+
+              <Field label="Tolerancia de días entre la fecha del banco y la del sistema">
+                <Input type="number" min={0} max={15} value={toleranciaDias} onChange={(e) => setToleranciaDias(e.target.value)} />
+              </Field>
+
+              {/* Vista previa de las primeras filas ya interpretadas */}
+              <div style={{ fontSize: 11.5, color: C.mut, marginBottom: 6 }}>Vista previa (primeras 3 filas):</div>
+              <div style={{ border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <tbody>
+                    {normalizarLineasBanco(datos.slice(0, 3), { colFecha, colDescripcion, modoMonto, colMonto, colDebito, colCredito }).map((l, i) => (
+                      <tr key={i}>
+                        <Td>{fmtD(l.fecha)}</Td>
+                        <Td>{l.descripcion || "—"}</Td>
+                        <Td right style={{ color: l.monto < 0 ? C.rojo : C.verde, fontWeight: 600 }}>
+                          {l.monto >= 0 ? "+" : ""}{money(l.monto, banco?.moneda)}
+                        </Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+                <Btn onClick={emparejar} disabled={!listo}>Emparejar automáticamente</Btn>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {paso === 1 && resultado && (
+        <>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+            <ResumenChip color={C.verde} n={resultado.matches.length} label="emparejados automáticamente" />
+            <ResumenChip color={C.amar} n={resultado.ambiguos.length} label="ambiguos (revisar)" />
+            <ResumenChip color={C.mut} n={resultado.sinMatchEnSistema.length} label="solo en el banco" />
+            <ResumenChip color={C.mut} n={resultado.sinMatchEnBanco.length} label="solo en el sistema" />
+          </div>
+
+          {resultado.matches.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: C.ink }}>
+                  ✓ {resultado.matches.length} coincidencia(s) segura(s) — mismo monto y fecha cercana
+                </div>
+                {aplicados.size === 0 ? (
+                  <Btn small onClick={aplicarAutomaticos}>Marcar todos como conciliados</Btn>
+                ) : (
+                  <Badge tone="verde"><CheckCircle2 size={12} /> Aplicado</Badge>
+                )}
+              </div>
+              <div style={{ maxHeight: 160, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 10 }}>
+                {resultado.matches.map((m, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "7px 11px", fontSize: 12, borderBottom: `1px solid ${C.line}` }}>
+                    <span style={{ color: C.mut }}>{fmtD(m.linea.fecha)} · {m.linea.descripcion || m.movimiento.concepto}</span>
+                    <span style={{ fontWeight: 600, color: m.linea.monto < 0 ? C.rojo : C.verde }}>{money(m.linea.monto, banco?.moneda)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {resultado.ambiguos.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: C.ink, marginBottom: 8 }}>
+                ⚠ {resultado.ambiguos.length} línea(s) con más de una coincidencia posible — elige la correcta:
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {resultado.ambiguos.map((a, idx) => (
+                  <div key={idx} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.ink, marginBottom: 6 }}>
+                      Banco: {fmtD(a.linea.fecha)} · {a.linea.descripcion || "(sin descripción)"} · {money(a.linea.monto, banco?.moneda)}
+                    </div>
+                    {ambiguosResueltos[idx] ? (
+                      <Badge tone={ambiguosResueltos[idx] === "ninguno" ? "mut" : "verde"}>
+                        {ambiguosResueltos[idx] === "ninguno" ? "Sin marcar" : "Emparejado"}
+                      </Badge>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {a.candidatos.map((c) => (
+                          <Btn key={c.id} small variant="ghost" onClick={() => resolverAmbiguo(idx, c)}>
+                            Usar: {fmtD(c.fecha)} · {c.concepto}
+                          </Btn>
+                        ))}
+                        <Btn small variant="ghost" onClick={() => resolverAmbiguo(idx, null)}>Ninguno</Btn>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {resultado.sinMatchEnSistema.length > 0 && (
+            <DetalleColapsable
+              titulo={`${resultado.sinMatchEnSistema.length} línea(s) del banco sin registro en el sistema`}
+              nota="Podrían ser comisiones, intereses u otros movimientos del banco que aún no has registrado en CAD-Tesorería."
+            >
+              {resultado.sinMatchEnSistema.map((l, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 10px", fontSize: 12, borderBottom: `1px solid ${C.line}` }}>
+                  <span style={{ color: C.mut }}>{fmtD(l.fecha)} · {l.descripcion || "—"}</span>
+                  <span style={{ fontWeight: 600, color: l.monto < 0 ? C.rojo : C.verde }}>{money(l.monto, banco?.moneda)}</span>
+                </div>
+              ))}
+            </DetalleColapsable>
+          )}
+
+          {resultado.sinMatchEnBanco.length > 0 && (
+            <DetalleColapsable
+              titulo={`${resultado.sinMatchEnBanco.length} movimiento(s) del sistema no vistos en el banco`}
+              nota="Pagos o cobros ya registrados que todavía no aparecen en el estado de cuenta — probablemente en tránsito."
+            >
+              {resultado.sinMatchEnBanco.map((m) => (
+                <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 10px", fontSize: 12, borderBottom: `1px solid ${C.line}` }}>
+                  <span style={{ color: C.mut }}>{fmtD(m.fecha)} · {m.concepto}</span>
+                  <span style={{ fontWeight: 600, color: m.tipo === "DEBITO" ? C.rojo : C.verde }}>{money(m.monto, banco?.moneda)}</span>
+                </div>
+              ))}
+            </DetalleColapsable>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <Btn variant="ghost" onClick={() => setPaso(0)}>Volver</Btn>
+            <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
+            <Btn onClick={onTerminar}>Continuar a Nueva conciliación</Btn>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function ResumenChip({ color, n, label }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 12px", borderRadius: 999, background: color + "18", border: `1px solid ${color}` }}>
+      <span style={{ fontFamily: FONTS.SANS, fontWeight: 800, fontSize: 14, color }}>{n}</span>
+      <span style={{ fontSize: 11.5, color: C.ink }}>{label}</span>
+    </div>
+  );
+}
+
+function DetalleColapsable({ titulo, nota, children }) {
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <button
+        onClick={() => setAbierto((v) => !v)}
+        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 12.5, fontWeight: 700, color: C.mut }}
+      >
+        <HelpCircle size={13} /> {titulo} {abierto ? "▲" : "▼"}
+      </button>
+      {abierto && (
+        <>
+          <div style={{ fontSize: 11, color: C.mut2, margin: "6px 0" }}>{nota}</div>
+          <div style={{ maxHeight: 160, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 10, marginTop: 4 }}>
+            {children}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

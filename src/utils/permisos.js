@@ -21,16 +21,17 @@ export const CAPACIDADES = [
   { key: "ventas", label: "Ventas", desc: "Facturas de venta y cobranzas" },
   { key: "tesoreria", label: "Tesorería", desc: "Pagos, corridas y libro de bancos" },
   { key: "banco", label: "Banco", desc: "Movimientos y conciliación" },
+  { key: "planificacion", label: "Planificación Financiera", desc: "Flujo rodante a 13 semanas y prioridad de pago" },
   { key: "reportes", label: "Reportes", desc: "Reporte mensual y análisis de tasas" },
   { key: "ajustes", label: "Ajustes", desc: "Tasas, bancos y contactos" }
 ];
 
 /** Permisos por defecto de cada rol. */
 export const PLANTILLAS = {
-  MASTER:    { tablero: true, verBancos: true,  compras: true,  ventas: true,  tesoreria: true,  banco: true,  reportes: true,  ajustes: true },
-  TESORERIA: { tablero: true, verBancos: true,  compras: false, ventas: true,  tesoreria: true,  banco: true,  reportes: true,  ajustes: true },
-  COMPRAS:   { tablero: true, verBancos: false, compras: true,  ventas: false, tesoreria: false, banco: false, reportes: false, ajustes: false },
-  LECTOR:    { tablero: true, verBancos: false, compras: false, ventas: false, tesoreria: false, banco: false, reportes: false, ajustes: false }
+  MASTER:    { tablero: true, verBancos: true,  compras: true,  ventas: true,  tesoreria: true,  banco: true,  planificacion: true,  reportes: true,  ajustes: true },
+  TESORERIA: { tablero: true, verBancos: true,  compras: false, ventas: true,  tesoreria: true,  banco: true,  planificacion: true,  reportes: true,  ajustes: true },
+  COMPRAS:   { tablero: true, verBancos: false, compras: true,  ventas: false, tesoreria: false, banco: false, planificacion: false, reportes: false, ajustes: false },
+  LECTOR:    { tablero: true, verBancos: false, compras: false, ventas: false, tesoreria: false, banco: false, planificacion: false, reportes: false, ajustes: false }
 };
 
 /**

@@ -7,6 +7,7 @@ import { exportarReporteMensualPDF, exportarReporteMensualExcel } from "../../ut
 import { Section, Card } from "../../components/ui/Layout";
 import { Btn } from "../../components/ui/Buttons";
 import { Th, Td } from "../../components/ui/Table";
+import ResumenIA from "../../components/shared/ResumenIA";
 
 function hoyYYYYMM() {
   return new Date().toISOString().slice(0, 7);
@@ -60,6 +61,14 @@ export default function ReporteMensual({ st }) {
         <Info size={14} style={{ flexShrink: 0, marginTop: 1 }} />
         Este reporte muestra los movimientos que de verdad ocurrieron en {reporte.etiqueta} (no un saldo bancario retroactivo — el sistema no guarda "fotos" históricas de saldos día a día, así que evitamos mostrar un número que podría ser engañoso).
       </div>
+
+      <ResumenIA
+        titulo={`Reporte Financiero Mensual — ${reporte.etiqueta}`}
+        datos={{
+          compras: reporte.compras, pagos: reporte.pagos, ventas: reporte.ventas, cobros: reporte.cobros,
+          balanceNeto: reporte.balanceNeto, porCategoria: reporte.porCategoria
+        }}
+      />
 
       <Card style={{ padding: 0, marginBottom: 20, overflow: "hidden" }}>
         <div style={{ display: "flex", flexWrap: "wrap" }}>
